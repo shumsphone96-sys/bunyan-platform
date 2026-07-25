@@ -23,9 +23,12 @@ try {
   const resetPassword = process.env.ADMIN_RESET_PASSWORD;
   const adminName = process.env.ADMIN_NAME?.trim() || 'شمس الأنبياء أحمد أبو عقلة';
 
-  if (resetEmail || resetPassword) {
-    if (!resetEmail || !resetPassword) {
-      throw new Error('ADMIN_EMAIL and ADMIN_RESET_PASSWORD must both be set');
+  // ADMIN_EMAIL may remain permanently. A recovery runs only while
+  // ADMIN_RESET_PASSWORD is present, so removing the password after a
+  // successful reset will not break future deployments.
+  if (resetPassword) {
+    if (!resetEmail) {
+      throw new Error('ADMIN_EMAIL must be set when ADMIN_RESET_PASSWORD is used');
     }
     if (resetPassword.length < 10) {
       throw new Error('ADMIN_RESET_PASSWORD must be at least 10 characters');
@@ -69,6 +72,8 @@ try {
     }
 
     console.log('Remove ADMIN_RESET_PASSWORD after this successful deploy.');
+  } else if (resetEmail) {
+    console.log('ADMIN_EMAIL is set; no password reset requested.');
   }
 } finally {
   await pool.end();
