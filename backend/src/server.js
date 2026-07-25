@@ -66,6 +66,46 @@ async function sendEmailAlert({ subject, title, fields }) {
   return { channel: 'email', sent: true };
 }
 
+function phoneForWhatsApp(value = '') {
+  let phone = String(value).replace(/\D/g, '');
+  if (phone.startsWith('00')) phone = phone.slice(2);
+  if (phone.startsWith('0') && phone.length === 10) phone = `249${phone.slice(1)}`;
+  return phone;
+}
+
+async function sendTelegramAlert({ title, fields }) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  if (!token || !chatId) return { channel: 'telegram', sent: false, reason: 'not_configured' };
+
+  const details = Object.entries(fields)
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .map(([label, value]) => `<b>${escapeHtml(label)}:</b> ${escapeHtml(value)}`)
+    .join('\n');
+
+  const phoneValue = fields['الهاتف'] || '';
+  const whatsappPhone = phoneForWhatsApp(phoneValue);
+  const inlineKeyboard = [[{ text: '🌐 فتح لوحة الإدارة', url: adminPanelUrl }]];
+  if (whatsappPhone) {
+    inlineKeyboard.unshift([{ text: '💬 فتح واتساب', url: `https://wa.me/${whatsappPhone}` }]);
+  }
+
+  const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: `📥 <b>${escapeHtml(title)}</b>\n\n${details}`,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+      reply_markup: { inline_keyboard: inlineKeyboard }
+    })
+  });
+
+  if (!response.ok) throw new Error(`Telegram error ${response.status}: ${await response.text()}`);
+  return { channel: 'telegram', sent: true };
+}
+
 async function sendWhatsAppAlert({ title, fields }) {
   const token = process.env.WHATSAPP_ACCESS_TOKEN;
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
@@ -89,17 +129,18 @@ async function sendWhatsAppAlert({ title, fields }) {
 }
 
 function dispatchAlerts(payload) {
-  Promise.allSettled([sendEmailAlert(payload), sendWhatsAppAlert(payload)]).then(results => {
+  Promise.allSettled([sendEmailAlert(payload), sendTelegramAlert(payload), sendWhatsAppAlert(payload)]).then(results => {
     results.forEach(result => {
       if (result.status === 'rejected') console.error('Notification failed:', result.reason);
       else if (!result.value.sent) console.log(`Notification skipped (${result.value.channel}): ${result.value.reason}`);
+      else console.log(`Notification sent (${result.value.channel})`);
     });
   });
 }
 
 app.get('/health', asyncRoute(async (_req, res) => {
   await pool.query('SELECT 1');
-  res.json({ ok: true, service: 'bunyan-cloud-api', version: '5.0.0' });
+  res.json({ ok: true, service: 'bunyan-cloud-api', version: '5.1.0' });
 }));
 
 app.post('/api/setup', asyncRoute(async (req, res) => {
@@ -179,7 +220,7 @@ app.post('/api/notifications/test', auth, allow('admin'), asyncRoute(async (req,
     title: 'هذا اختبار ناجح لنظام إشعارات بُنْيَان',
     fields: { 'المدير': req.user.name, 'البريد': notificationEmail || 'غير مضبوط', 'الوقت': new Date().toISOString() }
   };
-  const results = await Promise.allSettled([sendEmailAlert(payload), sendWhatsAppAlert(payload)]);
+  const results = await Promise.allSettled([sendEmailAlert(payload), sendTelegramAlert(payload), sendWhatsAppAlert(payload)]);
   res.json(results.map(result => result.status === 'fulfilled' ? result.value : { sent: false, error: String(result.reason?.message || result.reason) }));
 }));
 
