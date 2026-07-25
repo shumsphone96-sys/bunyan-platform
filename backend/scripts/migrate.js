@@ -21,6 +21,7 @@ try {
 
   const resetEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
   const resetPassword = process.env.ADMIN_RESET_PASSWORD;
+  const adminName = process.env.ADMIN_NAME?.trim() || 'شمس الأنبياء أحمد أبو عقلة';
 
   if (resetEmail || resetPassword) {
     if (!resetEmail || !resetPassword) {
@@ -31,29 +32,43 @@ try {
     }
 
     const passwordHash = await bcrypt.hash(resetPassword, 12);
-    const result = await pool.query(
-      `WITH target_admin AS (
-         SELECT id
-         FROM users
-         WHERE role='admin'
-         ORDER BY (lower(email)=lower($2)) DESC, created_at ASC
-         LIMIT 1
-       )
-       UPDATE users
-       SET email=$2,
-           password_hash=$1,
-           is_active=true,
-           updated_at=now()
-       WHERE id=(SELECT id FROM target_admin)
-       RETURNING id,email`,
-      [passwordHash, resetEmail]
+
+    const existingAdmin = await pool.query(
+      `SELECT id FROM users WHERE role='admin' ORDER BY created_at ASC LIMIT 1`
     );
 
-    if (!result.rowCount) {
-      throw new Error('No admin account exists to reset');
+    let result;
+    if (existingAdmin.rowCount) {
+      result = await pool.query(
+        `UPDATE users
+         SET name=$1,
+             email=$2,
+             password_hash=$3,
+             role='admin',
+             is_active=true,
+             updated_at=now()
+         WHERE id=$4
+         RETURNING id,email`,
+        [adminName, resetEmail, passwordHash, existingAdmin.rows[0].id]
+      );
+      console.log(`Admin account recovered for ${result.rows[0].email}.`);
+    } else {
+      result = await pool.query(
+        `INSERT INTO users (name,email,password_hash,role,is_active)
+         VALUES ($1,$2,$3,'admin',true)
+         ON CONFLICT (email) DO UPDATE
+         SET name=EXCLUDED.name,
+             password_hash=EXCLUDED.password_hash,
+             role='admin',
+             is_active=true,
+             updated_at=now()
+         RETURNING id,email`,
+        [adminName, resetEmail, passwordHash]
+      );
+      console.log(`Admin account created for ${result.rows[0].email}.`);
     }
 
-    console.log(`Admin account recovered for ${result.rows[0].email}. Remove ADMIN_RESET_PASSWORD after this deploy.`);
+    console.log('Remove ADMIN_RESET_PASSWORD after this successful deploy.');
   }
 } finally {
   await pool.end();
