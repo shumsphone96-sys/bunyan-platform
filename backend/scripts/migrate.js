@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import fs from 'node:fs/promises';
+import bcrypt from 'bcryptjs';
 import pg from 'pg';
 
 const { Pool } = pg;
@@ -17,6 +18,33 @@ try {
   const sql = await fs.readFile(new URL('../database/schema.sql', import.meta.url), 'utf8');
   await pool.query(sql);
   console.log('BUNYAN database schema is ready.');
+
+  const resetEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const resetPassword = process.env.ADMIN_RESET_PASSWORD;
+
+  if (resetEmail || resetPassword) {
+    if (!resetEmail || !resetPassword) {
+      throw new Error('ADMIN_EMAIL and ADMIN_RESET_PASSWORD must both be set');
+    }
+    if (resetPassword.length < 10) {
+      throw new Error('ADMIN_RESET_PASSWORD must be at least 10 characters');
+    }
+
+    const passwordHash = await bcrypt.hash(resetPassword, 12);
+    const result = await pool.query(
+      `UPDATE users
+       SET password_hash=$1, is_active=true, updated_at=now()
+       WHERE lower(email)=lower($2) AND role='admin'
+       RETURNING id,email`,
+      [passwordHash, resetEmail]
+    );
+
+    if (!result.rowCount) {
+      throw new Error(`No admin account found for ${resetEmail}`);
+    }
+
+    console.log(`Admin password reset completed for ${result.rows[0].email}. Remove ADMIN_RESET_PASSWORD after this deploy.`);
+  }
 } finally {
   await pool.end();
 }
