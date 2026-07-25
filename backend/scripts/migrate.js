@@ -32,18 +32,28 @@ try {
 
     const passwordHash = await bcrypt.hash(resetPassword, 12);
     const result = await pool.query(
-      `UPDATE users
-       SET password_hash=$1, is_active=true, updated_at=now()
-       WHERE lower(email)=lower($2) AND role='admin'
+      `WITH target_admin AS (
+         SELECT id
+         FROM users
+         WHERE role='admin'
+         ORDER BY (lower(email)=lower($2)) DESC, created_at ASC
+         LIMIT 1
+       )
+       UPDATE users
+       SET email=$2,
+           password_hash=$1,
+           is_active=true,
+           updated_at=now()
+       WHERE id=(SELECT id FROM target_admin)
        RETURNING id,email`,
       [passwordHash, resetEmail]
     );
 
     if (!result.rowCount) {
-      throw new Error(`No admin account found for ${resetEmail}`);
+      throw new Error('No admin account exists to reset');
     }
 
-    console.log(`Admin password reset completed for ${result.rows[0].email}. Remove ADMIN_RESET_PASSWORD after this deploy.`);
+    console.log(`Admin account recovered for ${result.rows[0].email}. Remove ADMIN_RESET_PASSWORD after this deploy.`);
   }
 } finally {
   await pool.end();
