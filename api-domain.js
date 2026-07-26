@@ -29,13 +29,16 @@
     document.head.appendChild(script);
   };
 
-  loadStyle('./project-center.css?v=20260726-2305','project-center-style');
-  loadStyle('./financial-center.css?v=20260726-2325','financial-center-style');
-  loadStyle('./global-suite.css?v=20260726-2355','global-suite-style');
-  loadScript('./global-upgrade.js?v=20260726-2057','global-manager');
-  loadScript('./quick-project.js?v=20260726-2130','quick-project');
-  loadScript('./project-center.js?v=20260726-2305','project-center');
-  loadScript('./financial-center.js?v=20260726-2325','financial-center');
-  loadScript('./global-admin.js?v=20260726-2359','global-admin');
-  loadScript('./global-suite.js?v=20260726-2359','global-suite');
+  const release='20260726-7-1';
+  loadStyle(`./project-center.css?v=${release}`,'project-center-style');
+  loadStyle(`./financial-center.css?v=${release}`,'financial-center-style');
+  loadStyle(`./global-suite.css?v=${release}`,'global-suite-style');
+  loadStyle(`./project-transparency.css?v=${release}`,'project-transparency-style');
+  loadScript(`./global-upgrade.js?v=${release}`,'global-manager');
+  loadScript(`./quick-project.js?v=${release}`,'quick-project');
+  loadScript(`./project-center.js?v=${release}`,'project-center');
+  loadScript(`./financial-center.js?v=${release}`,'financial-center');
+  loadScript(`./global-admin.js?v=${release}`,'global-admin');
+  loadScript(`./global-suite.js?v=${release}`,'global-suite');
+  loadScript(`./project-transparency.js?v=${release}`,'project-transparency');
 })();
