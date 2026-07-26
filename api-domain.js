@@ -36,5 +36,6 @@
   loadScript('./quick-project.js?v=20260726-2130','quick-project');
   loadScript('./project-center.js?v=20260726-2305','project-center');
   loadScript('./financial-center.js?v=20260726-2325','financial-center');
-  loadScript('./global-suite.js?v=20260726-2355','global-suite');
+  loadScript('./global-admin.js?v=20260726-2359','global-admin');
+  loadScript('./global-suite.js?v=20260726-2359','global-suite');
 })();
