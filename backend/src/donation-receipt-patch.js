@@ -17,6 +17,25 @@ const allowedMimeTypes = new Set([
   'image/webp'
 ]);
 
+const allowedOrigins = new Set([
+  'https://bunyan-sudan.org',
+  'https://www.bunyan-sudan.org',
+  'https://shumsphone96-sys.github.io'
+]);
+
+function applyDonationCors(req, res, next) {
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.has(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  next();
+}
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 3 * 1024 * 1024, files: 1 },
@@ -60,7 +79,11 @@ express.application.post = function patchedPost(path, ...handlers) {
           .catch(err => {
             console.error('Donation receipt database error:', err);
             if (!res.headersSent) {
-              return res.status(500).json({ error: err.message || 'تعذر حفظ إشعار التحويل' });
+              return originalJson({
+                ...body,
+                receiptUploaded: false,
+                receiptError: err.message || 'تعذر حفظ إشعار التحويل'
+              });
             }
           });
       };
@@ -71,6 +94,7 @@ express.application.post = function patchedPost(path, ...handlers) {
     return previousPost.call(
       this,
       ['/api/public/donations', '/api/donations'],
+      applyDonationCors,
       donationUpload,
       saveReceiptAfterDonation,
       ...handlers
@@ -84,6 +108,9 @@ express.application.listen = function donationReceiptListen(...args) {
   const app = this;
   const jwtSecret = process.env.JWT_SECRET;
 
+  // معالجة طلبات preflight الخاصة بنموذج التبرع، حتى لو كانت إعدادات CORS العامة قديمة.
+  app.options(['/api/public/donations', '/api/donations'], applyDonationCors);
+
   const auth = (req, res, next) => {
     const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
     if (!token) return res.status(401).json({ error: 'يلزم تسجيل الدخول' });
@@ -95,7 +122,7 @@ express.application.listen = function donationReceiptListen(...args) {
     }
   };
 
-  app.post('/api/public/donations/:id/receipt', async (req, res) => {
+  app.post('/api/public/donations/:id/receipt', applyDonationCors, async (req, res) => {
     try {
       const data = z.object({
         fileName: z.string().min(1).max(180),
