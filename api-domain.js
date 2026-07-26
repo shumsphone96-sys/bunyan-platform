@@ -10,16 +10,27 @@
       .catch(()=>{});
   }
 
+  const loadStyle=(href,key)=>{
+    if(document.querySelector(`link[data-bunyan-module="${key}"]`))return;
+    const link=document.createElement('link');
+    link.rel='stylesheet';
+    link.href=href;
+    link.dataset.bunyanModule=key;
+    document.head.appendChild(link);
+  };
+
   const loadScript=(src,key)=>{
-    if(document.querySelector(`script[data-bunyan-${key}]`))return;
+    if(document.querySelector(`script[data-bunyan-module="${key}"]`))return;
     const script=document.createElement('script');
     script.src=src;
     script.defer=true;
-    script.dataset[`bunyan${key[0].toUpperCase()+key.slice(1)}`]='true';
+    script.dataset.bunyanModule=key;
     script.onerror=()=>console.error(`تعذر تحميل ${src}`);
     document.head.appendChild(script);
   };
 
-  loadScript('./global-upgrade.js?v=20260726-2057','globalManager');
-  loadScript('./quick-project.js?v=20260726-2103','quickProject');
+  loadStyle('./project-center.css?v=20260726-2305','project-center-style');
+  loadScript('./global-upgrade.js?v=20260726-2057','global-manager');
+  loadScript('./quick-project.js?v=20260726-2130','quick-project');
+  loadScript('./project-center.js?v=20260726-2305','project-center');
 })();
