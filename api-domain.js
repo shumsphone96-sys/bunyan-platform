@@ -30,7 +30,9 @@
   };
 
   loadStyle('./project-center.css?v=20260726-2305','project-center-style');
+  loadStyle('./financial-center.css?v=20260726-2325','financial-center-style');
   loadScript('./global-upgrade.js?v=20260726-2057','global-manager');
   loadScript('./quick-project.js?v=20260726-2130','quick-project');
   loadScript('./project-center.js?v=20260726-2305','project-center');
+  loadScript('./financial-center.js?v=20260726-2325','financial-center');
 })();
