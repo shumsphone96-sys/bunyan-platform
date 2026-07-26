@@ -4,17 +4,14 @@ const API_ORIGINS = Array.isArray(window.BUNYAN_API_ORIGINS) && window.BUNYAN_AP
   : [window.BUNYAN_API_ORIGIN || 'https://api.bunyan-sudan.org', 'https://bunyan-api-qhkf.onrender.com'];
 const state = { token: sessionStorage.getItem('bunyan_token') || '', view: 'home', apiOrigin: sessionStorage.getItem('bunyan_api_origin') || API_ORIGINS[0] };
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const date = v => v ? new Date(v).toLocaleString('ar-SD') : '—';
+const date = v => v ? new Date(v).toLocaleString('ar-SD', { dateStyle:'medium', timeStyle:'short' }) : '—';
 const makeRequestId = () => (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `req_${Date.now()}_${Math.random().toString(36).slice(2)}`);
 
 async function fetchFrom(origin, path, options, headers) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 30000);
-  try {
-    return await fetch(`${origin}${path}`, { ...options, headers, signal: controller.signal, cache: 'no-store' });
-  } finally {
-    clearTimeout(timer);
-  }
+  try { return await fetch(`${origin}${path}`, { ...options, headers, signal: controller.signal, cache: 'no-store' }); }
+  finally { clearTimeout(timer); }
 }
 
 async function request(path, options = {}) {
@@ -24,7 +21,6 @@ async function request(path, options = {}) {
     headers['Content-Type'] = 'application/json';
     if (typeof options.body === 'object') options.body = JSON.stringify(options.body);
   }
-
   const orderedOrigins = [state.apiOrigin, ...API_ORIGINS.filter(x => x !== state.apiOrigin)];
   let lastError;
   for (const origin of orderedOrigins) {
@@ -34,10 +30,7 @@ async function request(path, options = {}) {
       let data = {};
       try { data = text ? JSON.parse(text) : {}; } catch { data = { message: text }; }
       if (!res.ok) {
-        if (res.status === 401 && state.token) {
-          state.token = '';
-          sessionStorage.removeItem('bunyan_token');
-        }
+        if (res.status === 401 && state.token) { state.token=''; sessionStorage.removeItem('bunyan_token'); }
         const error = new Error(data.error || data.message || `خطأ في الخادم (${res.status})`);
         error.status = res.status;
         throw error;
@@ -47,7 +40,6 @@ async function request(path, options = {}) {
       return data;
     } catch (err) {
       lastError = err;
-      // أخطاء 4xx حقيقية لا تُعاد على خادم آخر، باستثناء 401 الذي قد ينتج عن اختلاف النشر.
       if (err.status && err.status >= 400 && err.status < 500 && err.status !== 401 && err.status !== 403) throw err;
     }
   }
@@ -66,33 +58,63 @@ async function loadPublic() {
   const projectGrid = $('#projectGrid');
   try {
     const projects = await request('/api/public/projects');
-    if (projectGrid) {
-      projectGrid.innerHTML = projects.length
-        ? projects.map(p => `<article class="card"><span class="badge">${esc(p.status || 'مبادرة')}</span><h3>${esc(p.name || p.title)}</h3><p>${esc(p.summary || p.description || '')}</p><button class="primary" onclick='openDonateModal(${JSON.stringify(p.name || p.title || '')})'>ساهم في المشروع</button></article>`).join('')
-        : '<p>لا توجد مشروعات منشورة حالياً.</p>';
-    }
+    if (projectGrid) projectGrid.innerHTML = projects.length
+      ? projects.map(p => `<article class="card"><span class="badge">${esc(p.status || 'مبادرة')}</span><h3>${esc(p.name || p.title)}</h3><p>${esc(p.summary || p.description || '')}</p><button class="primary" onclick='openDonateModal(${JSON.stringify(p.name || p.title || '')})'>ساهم في المشروع</button></article>`).join('')
+      : '<p>لا توجد مشروعات منشورة حالياً.</p>';
   } catch (err) {
-    if (projectGrid) projectGrid.innerHTML = `<div class="error-msg">تعذر تحميل المشروعات: ${esc(err.message)}</div><button class="outline" onclick="loadPublic()">إعادة المحاولة</button>`;
+    if (projectGrid) projectGrid.innerHTML = `<div class="error-msg">تعذر تحميل المشروعات: ${esc(err.message)}</div><button class="outline dark-outline" onclick="loadPublic()">إعادة المحاولة</button>`;
   }
-
   const newsGrid = $('#newsGrid');
   try {
     const news = await request('/api/public/news');
     if (newsGrid) newsGrid.innerHTML = news.length
       ? news.map(n => `<article class="card"><h3>${esc(n.title)}</h3><p>${esc(n.body || n.content || '')}</p><small>${date(n.published_at || n.created_at)}</small></article>`).join('')
       : '<p>لا توجد أخبار منشورة حالياً.</p>';
-  } catch (err) {
-    if (newsGrid) newsGrid.innerHTML = `<div class="error-msg">تعذر تحميل الأخبار: ${esc(err.message)}</div>`;
-  }
+  } catch (err) { if (newsGrid) newsGrid.innerHTML = `<div class="error-msg">تعذر تحميل الأخبار: ${esc(err.message)}</div>`; }
 }
 window.loadPublic = loadPublic;
 
+const fieldLabels = {
+  id:'الرقم', name:'الاسم', donor:'اسم المساهم', phone:'الهاتف', amount:'المبلغ', currency:'العملة',
+  project_name:'المشروع', project_id:'معرّف المشروع', method:'طريقة الدفع', reference:'رقم المرجع', status:'الحالة',
+  created_at:'تاريخ التسجيل', updated_at:'آخر تحديث', verified_at:'تاريخ التوثيق', verified_by:'وثّق بواسطة',
+  summary:'الملخص', progress:'نسبة الإنجاز', beneficiaries_target:'المستهدفون', budget:'الميزانية', is_public:'منشور',
+  title:'العنوان', body:'المحتوى', published_at:'تاريخ النشر', email:'البريد', skill:'المهارة', hours:'الساعات',
+  service:'الخدمة', role:'نوع المشاركة', message:'الرسالة', notes:'ملاحظات'
+};
+const statusLabels = { pending:'قيد المراجعة', verified:'موثقة', rejected:'مرفوضة', new:'جديد', review:'قيد المراجعة', accepted:'مقبول', completed:'مكتمل', active:'نشط', inactive:'غير نشط' };
+const hiddenFields = new Set(['password_hash','file_data','verified_by','project_id']);
+const viewFields = {
+  donations:['donor','phone','amount','currency','project_name','method','reference','status','created_at','verified_at'],
+  projects:['name','summary','status','progress','budget','currency','is_public','created_at'],
+  beneficiaries:['name','phone','service','status','notes','created_at'],
+  volunteers:['name','phone','email','skill','hours','status','created_at'],
+  news:['title','body','published_at','is_public','created_at'],
+  requests:['name','phone','role','message','status','created_at']
+};
+function displayValue(key, value) {
+  if (value === null || value === undefined || value === '') return '—';
+  if (key.endsWith('_at')) return date(value);
+  if (key === 'status') return statusLabels[value] || value;
+  if (typeof value === 'boolean') return value ? 'نعم' : 'لا';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return value;
+}
 function statCard(label, value) { return `<article class="card"><h3>${esc(label)}</h3><strong style="font-size:2rem">${esc(value)}</strong></article>`; }
+function renderAdminRows(view, rows) {
+  const wanted = viewFields[view] || Object.keys(rows[0]);
+  const cols = wanted.filter(k => Object.hasOwn(rows[0], k) && !hiddenFields.has(k));
+  const desktop = `<div class="admin-table-wrap"><table class="admin-table"><thead><tr>${cols.map(c=>`<th>${esc(fieldLabels[c] || c)}</th>`).join('')}${view==='donations'?'<th>الإيصال</th>':''}</tr></thead><tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(displayValue(c,r[c]))}</td>`).join('')}${view==='donations'?`<td><button class="receipt-btn" onclick="downloadReceipt('${r.id}')">عرض الإيصال</button></td>`:''}</tr>`).join('')}</tbody></table></div>`;
+  const mobile = `<div class="admin-mobile-list">${rows.map(r=>`<article class="admin-record">${cols.map(c=>`<div class="record-row"><span>${esc(fieldLabels[c] || c)}</span><strong>${esc(displayValue(c,r[c]))}</strong></div>`).join('')}${view==='donations'?`<button class="receipt-btn mobile-receipt" onclick="downloadReceipt('${r.id}')">عرض الإيصال</button>`:''}</article>`).join('')}</div>`;
+  return desktop + mobile;
+}
+
 async function loadDashboard(view = state.view) {
   state.view = view;
   const content = $('#dashContent');
   const title = $('#dashTitle');
   if (!content) return;
+  document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === view));
   content.innerHTML = '<div class="loading">جاري التحميل...</div>';
   try {
     if (view === 'home') {
@@ -104,11 +126,10 @@ async function loadDashboard(view = state.view) {
     const labels = { projects:'المشروعات',beneficiaries:'المستفيدون',volunteers:'المتطوعون',donations:'التبرعات',news:'الأخبار',requests:'طلبات المشاركة' };
     const rows = await request(`/api/${view}`);
     if (title) title.textContent = labels[view] || view;
-    if (!Array.isArray(rows) || !rows.length) { content.innerHTML = '<p>لا توجد سجلات حتى الآن.</p>'; return; }
-    const cols = Object.keys(rows[0]).filter(k => !['password_hash','file_data'].includes(k));
-    content.innerHTML = `<div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr>${cols.map(c=>`<th style="padding:9px;border-bottom:1px solid #ddd">${esc(c)}</th>`).join('')}${view==='donations'?'<th>الإيصال</th>':''}</tr></thead><tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td style="padding:9px;border-bottom:1px solid #eee">${esc(typeof r[c]==='object'?JSON.stringify(r[c]):r[c])}</td>`).join('')}${view==='donations'?`<td><button class="outline" onclick="downloadReceipt('${r.id}')">عرض</button></td>`:''}</tr>`).join('')}</tbody></table></div>`;
+    if (!Array.isArray(rows) || !rows.length) { content.innerHTML = '<div class="empty">لا توجد سجلات حتى الآن.</div>'; return; }
+    content.innerHTML = renderAdminRows(view, rows);
   } catch (err) {
-    content.innerHTML = `<div class="error-msg">${esc(err.message)}</div><button class="outline" onclick="loadDashboard('${esc(view)}')">إعادة المحاولة</button>`;
+    content.innerHTML = `<div class="error-msg">${esc(err.message)}</div><button class="outline dark-outline" onclick="loadDashboard('${esc(view)}')">إعادة المحاولة</button>`;
     if (!state.token) $('#dash')?.classList.remove('open');
   }
 }
@@ -129,7 +150,7 @@ window.downloadReceipt = async donationId => {
 
 function installPasswordReset(loginModal) {
   const form = $('#loginForm'); if (!form || $('#forgotPasswordBtn')) return;
-  const btn = document.createElement('button'); btn.type='button'; btn.id='forgotPasswordBtn'; btn.className='outline'; btn.textContent='نسيت كلمة السر؟'; form.appendChild(btn);
+  const btn = document.createElement('button'); btn.type='button'; btn.id='forgotPasswordBtn'; btn.className='outline dark-outline'; btn.textContent='نسيت كلمة السر؟'; form.appendChild(btn);
   const modal = document.createElement('div'); modal.className='modal'; modal.id='passwordResetModal'; modal.innerHTML=`<form id="passwordResetForm"><button type="button" id="closePasswordReset">×</button><h2>إعادة تعيين كلمة السر</h2><input name="email" type="email" placeholder="البريد المسجل" required><button type="button" class="primary" id="sendResetCode">إرسال الرمز</button><div id="resetFields" hidden><input name="code" inputmode="numeric" maxlength="6" placeholder="رمز من 6 أرقام"><input name="newPassword" type="password" minlength="10" placeholder="كلمة السر الجديدة"><input name="confirmPassword" type="password" minlength="10" placeholder="تأكيد كلمة السر"><button class="primary">حفظ كلمة السر</button></div><small id="resetMsg"></small></form>`; document.body.appendChild(modal);
   const rf=$('#passwordResetForm'), msg=$('#resetMsg'), fields=$('#resetFields');
   btn.onclick=()=>{loginModal?.classList.remove('open');modal.classList.add('open');};
