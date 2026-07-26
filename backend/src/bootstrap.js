@@ -1,3 +1,4 @@
+import './request-config-patch.js';
 import './auth-patch.js';
 import './donation-receipt-patch.js';
 import './platform-patch.js';
