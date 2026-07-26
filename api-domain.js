@@ -29,11 +29,12 @@
     document.head.appendChild(script);
   };
 
-  const release='20260726-7-1';
+  const release='20260726-final-1';
   loadStyle(`./project-center.css?v=${release}`,'project-center-style');
   loadStyle(`./financial-center.css?v=${release}`,'financial-center-style');
   loadStyle(`./global-suite.css?v=${release}`,'global-suite-style');
   loadStyle(`./project-transparency.css?v=${release}`,'project-transparency-style');
+  loadStyle(`./completion-suite.css?v=${release}`,'completion-suite-style');
   loadScript(`./global-upgrade.js?v=${release}`,'global-manager');
   loadScript(`./quick-project.js?v=${release}`,'quick-project');
   loadScript(`./project-center.js?v=${release}`,'project-center');
@@ -41,4 +42,5 @@
   loadScript(`./global-admin.js?v=${release}`,'global-admin');
   loadScript(`./global-suite.js?v=${release}`,'global-suite');
   loadScript(`./project-transparency.js?v=${release}`,'project-transparency');
+  loadScript(`./completion-suite.js?v=${release}`,'completion-suite');
 })();
