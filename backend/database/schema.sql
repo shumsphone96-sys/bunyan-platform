@@ -74,6 +74,16 @@ CREATE TABLE IF NOT EXISTS donations (
   verified_by uuid REFERENCES users(id) ON DELETE SET NULL
 );
 
+CREATE TABLE IF NOT EXISTS donation_attachments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  donation_id uuid NOT NULL REFERENCES donations(id) ON DELETE CASCADE,
+  file_name text NOT NULL,
+  mime_type text NOT NULL,
+  size_bytes integer NOT NULL CHECK (size_bytes > 0 AND size_bytes <= 3145728),
+  file_data bytea NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS news (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   title text NOT NULL,
@@ -135,6 +145,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 CREATE INDEX IF NOT EXISTS idx_password_reset_user_created ON password_reset_codes(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_projects_public ON projects(is_public, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_donations_status ON donations(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_donation_attachments_donation ON donation_attachments(donation_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_requests_status ON participation_requests(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_request_notes_request ON request_notes(request_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_request_attachments_request ON request_attachments(request_id, created_at DESC);
