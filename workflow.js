@@ -15,6 +15,31 @@
     document.body.insertAdjacentHTML('beforeend','<div class="modal request-modal" id="requestDetailsModal"><div class="request-panel"><button class="modal-close" id="closeRequestDetails">×</button><div id="requestDetailsContent"></div></div></div>');
     $('#closeRequestDetails').onclick=()=>$('#requestDetailsModal').classList.remove('show');
   }
+  function ensurePasswordControls(){
+    if(!$('#changePasswordBtn')){
+      const button=document.createElement('button');
+      button.id='changePasswordBtn';button.textContent='تغيير كلمة السر';
+      const logoutButton=$('#logout');logoutButton.parentNode.insertBefore(button,logoutButton);
+      button.onclick=openPasswordModal;
+    }
+    if(!$('#passwordModal')){
+      document.body.insertAdjacentHTML('beforeend',`<div class="modal" id="passwordModal"><form id="passwordForm"><button type="button" class="modal-close" id="closePassword">×</button><h2>تغيير كلمة سر الإدارة</h2><input name="currentPassword" type="password" autocomplete="current-password" placeholder="كلمة السر الحالية" required><input name="newPassword" type="password" minlength="10" autocomplete="new-password" placeholder="كلمة السر الجديدة — 10 أحرف على الأقل" required><input name="confirmPassword" type="password" minlength="10" autocomplete="new-password" placeholder="تأكيد كلمة السر الجديدة" required><button class="primary" type="submit">حفظ كلمة السر الجديدة</button><p id="passwordMsg"></p></form></div>`);
+      $('#closePassword').onclick=()=>$('#passwordModal').classList.remove('show');
+      $('#passwordForm').onsubmit=changePassword;
+    }
+  }
+  function openPasswordModal(){ensurePasswordControls();$('#passwordForm').reset();$('#passwordMsg').textContent='';$('#passwordModal').classList.add('show')}
+  async function changePassword(e){
+    e.preventDefault();const form=new FormData(e.target),currentPassword=String(form.get('currentPassword')||''),newPassword=String(form.get('newPassword')||''),confirmPassword=String(form.get('confirmPassword')||''),msg=$('#passwordMsg');
+    if(newPassword.length<10){msg.textContent='كلمة السر الجديدة يجب ألا تقل عن 10 أحرف.';return}
+    if(newPassword!==confirmPassword){msg.textContent='تأكيد كلمة السر غير مطابق.';return}
+    msg.textContent='جارٍ تغيير كلمة السر...';
+    try{
+      await api('/api/auth/change-password',{method:'POST',body:JSON.stringify({currentPassword,newPassword})});
+      msg.className='success';msg.textContent='تم تغيير كلمة السر بنجاح. سيتم تسجيل خروجك الآن.';
+      setTimeout(()=>{state.token='';sessionStorage.removeItem('bunyan_token');$('#passwordModal').classList.remove('show');dash.classList.remove('show');login.classList.add('show');loginMsg.textContent='سجّل الدخول بكلمة السر الجديدة.'},1200);
+    }catch(err){msg.className='';msg.textContent=err.message}
+  }
   function fileToBase64(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result).split(',')[1]||'');r.onerror=()=>reject(new Error('تعذر قراءة الملف'));r.readAsDataURL(file)})}
   async function downloadAttachment(id,name){
     try{const res=await api(`/api/attachments/${id}/download`,{raw:true});const blob=await res.blob(),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name||'attachment';a.click();URL.revokeObjectURL(a.href)}catch(err){alert(err.message)}
@@ -45,4 +70,5 @@
       }
     });
   };
+  ensurePasswordControls();
 })();
