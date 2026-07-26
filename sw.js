@@ -1,4 +1,4 @@
-const C='bunyan-v13-contact-centre';
+const C='bunyan-v14-official-domain';
 const ASSETS=['./','./index.html','./styles.css','./workflow.css','./auth-center.css','./global-upgrade.css','./global-admin.css','./contact.css','./api-domain.js','./app.js','./workflow.js','./auth-center.js','./donation-receipt.js','./global-upgrade.js','./global-admin.js','./contact.js','./manifest.json'];
 self.addEventListener('install',event=>{self.skipWaiting();event.waitUntil(caches.open(C).then(cache=>cache.addAll(ASSETS)))});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==C).map(key=>caches.delete(key)))).then(()=>self.clients.claim()))});
