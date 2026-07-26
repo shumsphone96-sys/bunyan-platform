@@ -10,16 +10,16 @@
       .catch(()=>{});
   }
 
-  // index.html كان يحمّل app.js فقط؛ لذلك ميزات إدارة المشروعات لم تكن تعمل.
-  // نحمّل وحدة الإدارة العالمية صراحة مع رقم إصدار لتجاوز الكاش.
-  const loadManager=()=>{
-    if(document.querySelector('script[data-bunyan-global-manager]')) return;
+  const loadScript=(src,key)=>{
+    if(document.querySelector(`script[data-bunyan-${key}]`))return;
     const script=document.createElement('script');
-    script.src='./global-upgrade.js?v=20260726-2057';
+    script.src=src;
     script.defer=true;
-    script.dataset.bunyanGlobalManager='true';
-    script.onerror=()=>console.error('تعذر تحميل وحدة إدارة المشروعات');
+    script.dataset[`bunyan${key[0].toUpperCase()+key.slice(1)}`]='true';
+    script.onerror=()=>console.error(`تعذر تحميل ${src}`);
     document.head.appendChild(script);
   };
-  loadManager();
+
+  loadScript('./global-upgrade.js?v=20260726-2057','globalManager');
+  loadScript('./quick-project.js?v=20260726-2103','quickProject');
 })();
