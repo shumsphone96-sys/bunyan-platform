@@ -87,9 +87,9 @@ CREATE TABLE IF NOT EXISTS participation_requests (
 );
 
 ALTER TABLE participation_requests ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE participation_requests DROP CONSTRAINT IF EXISTS participation_requests_status_check;
 UPDATE participation_requests SET status='review' WHERE status='contacted';
 UPDATE participation_requests SET status='completed' WHERE status='closed';
-ALTER TABLE participation_requests DROP CONSTRAINT IF EXISTS participation_requests_status_check;
 ALTER TABLE participation_requests ADD CONSTRAINT participation_requests_status_check CHECK (status IN ('new','review','accepted','rejected','completed'));
 
 CREATE TABLE IF NOT EXISTS request_notes (
