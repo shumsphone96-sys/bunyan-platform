@@ -1,0 +1,111 @@
+(()=>{
+  const $=s=>document.querySelector(s);
+  const $$=s=>[...document.querySelectorAll(s)];
+  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const origins=window.BUNYAN_API_ORIGINS||[window.BUNYAN_API_ORIGIN||'https://api.bunyan-sudan.org','https://bunyan-api-qhkf.onrender.com'];
+  const token=()=>sessionStorage.getItem('bunyan_token')||'';
+  let activeOrigin=sessionStorage.getItem('bunyan_api_origin')||origins[0];
+  let projects=[];
+
+  async function api(path,options={}){
+    const headers={...(options.headers||{})};
+    if(token())headers.Authorization=`Bearer ${token()}`;
+    if(options.body&&!(options.body instanceof FormData)){
+      headers['Content-Type']='application/json';
+      if(typeof options.body==='object')options.body=JSON.stringify(options.body);
+    }
+    let last;
+    for(const base of [activeOrigin,...origins.filter(x=>x!==activeOrigin)]){
+      try{
+        const res=await fetch(base+path,{...options,headers,cache:'no-store'});
+        const text=await res.text();let data={};
+        try{data=text?JSON.parse(text):{}}catch{data={message:text}}
+        if(!res.ok){const e=new Error(data.error||data.message||`فشل الطلب (${res.status})`);e.status=res.status;throw e}
+        activeOrigin=base;sessionStorage.setItem('bunyan_api_origin',base);return data;
+      }catch(e){last=e;if(e.status&&e.status>=400&&e.status<500&&e.status!==401&&e.status!==403)throw e}
+    }
+    throw last||new Error('تعذر الاتصال بالخادم');
+  }
+
+  const statusText={planning:'قيد التخطيط',active:'نشط',paused:'متوقف مؤقتاً',completed:'مكتمل',draft:'مسودة'};
+  const money=(n,c='SDG')=>`${Number(n||0).toLocaleString('en-GB')} ${esc(c)}`;
+
+  function projectCard(p){
+    const progress=Math.max(0,Math.min(100,Number(p.progress||0)));
+    return `<article class="pc-card" data-search="${esc(`${p.name||''} ${p.summary||''} ${p.status||''}`.toLowerCase())}">
+      <div class="pc-card-head"><span class="pc-status">${esc(statusText[p.status]||p.status||'جديد')}</span><span class="pc-publish ${p.is_public?'on':''}">${p.is_public?'منشور':'مسودة'}</span></div>
+      <h3>${esc(p.name||'مشروع بلا اسم')}</h3>
+      <p>${esc(p.summary||'لا يوجد وصف للمشروع.')}</p>
+      <div class="pc-progress"><i style="width:${progress}%"></i></div>
+      <div class="pc-meta"><span>الإنجاز <b>${progress}%</b></span><span>الميزانية <b>${money(p.budget,p.currency)}</b></span></div>
+      <div class="pc-meta"><span>المستهدفون <b>${Number(p.beneficiaries_target||0).toLocaleString('en-GB')}</b></span><span>${p.is_public?'ظاهر في الموقع':'غير ظاهر للزوار'}</span></div>
+      <div class="pc-actions"><button class="pc-btn" data-preview="${p.id}">معاينة</button><button class="pc-btn" data-edit="${p.id}">تعديل</button><button class="pc-btn danger" data-delete="${p.id}">حذف</button></div>
+    </article>`;
+  }
+
+  async function render(){
+    const content=$('#dashContent'),title=$('#dashTitle');if(!content)return;
+    if(title)title.textContent='مركز إدارة المشروعات';
+    content.innerHTML='<div class="pc-loading">جاري تحميل المشروعات...</div>';
+    try{
+      projects=await api('/api/projects');
+      content.innerHTML=`<section class="pc-hero"><div><span>BUNYAN GLOBAL PROJECTS</span><h3>مركز المشروعات والشفافية</h3><p>إنشاء المشروع، ضبط الميزانية، متابعة الإنجاز، النشر والمعاينة من الهاتف.</p></div><button id="pcAdd" class="primary">+ مشروع جديد</button></section>
+      <div class="pc-toolbar"><input id="pcSearch" placeholder="ابحث باسم المشروع أو الحالة"><select id="pcFilter"><option value="all">كل المشروعات</option><option value="public">المنشورة</option><option value="draft">المسودات</option><option value="active">النشطة</option><option value="completed">المكتملة</option></select><span>${projects.length} مشروع</span></div>
+      <div id="pcGrid" class="pc-grid">${projects.length?projects.map(projectCard).join(''):'<div class="pc-empty">لا توجد مشروعات بعد. ابدأ بإنشاء أول مشروع.</div>'}</div>`;
+      $('#pcAdd').onclick=()=>editor();
+      $('#pcSearch').oninput=filter;
+      $('#pcFilter').onchange=filter;
+      $$('[data-preview]').forEach(b=>b.onclick=()=>preview(projects.find(p=>String(p.id)===b.dataset.preview)));
+      $$('[data-edit]').forEach(b=>b.onclick=()=>editor(projects.find(p=>String(p.id)===b.dataset.edit)));
+      $$('[data-delete]').forEach(b=>b.onclick=()=>remove(b.dataset.delete));
+    }catch(e){content.innerHTML=`<div class="error-msg">${esc(e.message)}</div><button class="primary" onclick="window.openProjectCenter()">إعادة المحاولة</button>`}
+  }
+
+  function filter(){
+    const q=$('#pcSearch')?.value.trim().toLowerCase()||'';
+    const f=$('#pcFilter')?.value||'all';
+    $$('.pc-card').forEach(card=>{
+      const p=projects.find(x=>String(x.id)===card.querySelector('[data-edit]')?.dataset.edit);
+      const matchQ=!q||card.dataset.search.includes(q);
+      const matchF=f==='all'||(f==='public'&&p?.is_public)||(f==='draft'&&!p?.is_public)||p?.status===f;
+      card.hidden=!(matchQ&&matchF);
+    });
+  }
+
+  function editor(item={}){
+    $('#pcModal')?.remove();
+    const modal=document.createElement('div');modal.id='pcModal';modal.className='pc-modal';
+    modal.innerHTML=`<form class="pc-form"><button type="button" class="pc-close">×</button><div><small>BUNYAN PROJECT BUILDER</small><h2>${item.id?'تعديل المشروع':'إنشاء مشروع جديد'}</h2></div>
+      <label>اسم المشروع<input name="name" value="${esc(item.name||'')}" minlength="3" maxlength="160" required></label>
+      <label>الملخص التنفيذي<textarea name="summary" rows="5" minlength="10" maxlength="1200" required>${esc(item.summary||'')}</textarea></label>
+      <div class="pc-two"><label>الحالة<select name="status"><option value="planning">قيد التخطيط</option><option value="active">نشط</option><option value="paused">متوقف مؤقتاً</option><option value="completed">مكتمل</option></select></label><label>نسبة الإنجاز<input name="progress" type="number" min="0" max="100" value="${Number(item.progress||0)}" required></label></div>
+      <div class="pc-two"><label>الميزانية<input name="budget" type="number" min="0" step="0.01" value="${Number(item.budget||0)}" required></label><label>العملة<select name="currency"><option>SDG</option><option>SAR</option><option>USD</option></select></label></div>
+      <label>عدد المستفيدين المستهدف<input name="beneficiaries_target" type="number" min="0" value="${Number(item.beneficiaries_target||0)}"></label>
+      <label class="pc-check"><input name="is_public" type="checkbox" ${item.is_public?'checked':''}> نشر المشروع في الموقع العام</label>
+      <div class="pc-submit"><button type="button" class="pc-cancel">إلغاء</button><button class="primary" type="submit">${item.id?'حفظ التعديلات':'إنشاء المشروع'}</button></div><small class="pc-msg"></small></form>`;
+    document.body.appendChild(modal);
+    modal.querySelector('[name=status]').value=item.status||'planning';
+    modal.querySelector('[name=currency]').value=item.currency||'SDG';
+    const close=()=>modal.remove();modal.querySelector('.pc-close').onclick=close;modal.querySelector('.pc-cancel').onclick=close;modal.onclick=e=>{if(e.target===modal)close()};
+    modal.querySelector('form').onsubmit=async e=>{
+      e.preventDefault();const f=e.currentTarget,msg=f.querySelector('.pc-msg'),btn=f.querySelector('[type=submit]');
+      const d=Object.fromEntries(new FormData(f).entries());d.progress=Number(d.progress||0);d.budget=Number(d.budget||0);d.beneficiaries_target=Number(d.beneficiaries_target||0);d.is_public=f.elements.is_public.checked;
+      try{btn.disabled=true;msg.textContent='جاري الحفظ...';await api(item.id?`/api/projects/${item.id}`:'/api/projects',{method:item.id?'PATCH':'POST',body:d});msg.textContent='تم الحفظ بنجاح.';setTimeout(()=>{close();render();window.loadPublic?.()},500)}catch(x){msg.textContent=x.message}finally{btn.disabled=false}
+    };
+  }
+
+  function preview(p){
+    if(!p)return;$('#pcPreview')?.remove();const progress=Math.max(0,Math.min(100,Number(p.progress||0)));
+    const modal=document.createElement('div');modal.id='pcPreview';modal.className='pc-modal';modal.innerHTML=`<article class="pc-preview"><button class="pc-close">×</button><span class="pc-status">${esc(statusText[p.status]||p.status)}</span><h2>${esc(p.name)}</h2><p>${esc(p.summary||'')}</p><div class="pc-progress big"><i style="width:${progress}%"></i></div><div class="pc-preview-stats"><div><small>نسبة الإنجاز</small><b>${progress}%</b></div><div><small>الميزانية</small><b>${money(p.budget,p.currency)}</b></div><div><small>المستفيدون</small><b>${Number(p.beneficiaries_target||0).toLocaleString('en-GB')}</b></div></div><button class="primary" id="pcDonate">ساهم في هذا المشروع</button></article>`;document.body.appendChild(modal);modal.querySelector('.pc-close').onclick=()=>modal.remove();modal.onclick=e=>{if(e.target===modal)modal.remove()};$('#pcDonate').onclick=()=>{modal.remove();window.openDonateModal?.(p.name)};
+  }
+
+  async function remove(id){if(!confirm('هل تريد حذف هذا المشروع نهائياً؟'))return;try{await api(`/api/projects/${id}`,{method:'DELETE'});await render();window.loadPublic?.()}catch(e){alert(e.message)}}
+
+  function install(){
+    const btn=$('[data-view="projects"]');if(btn)btn.onclick=render;
+    const quick=$('#quickProjectBtn');if(quick)quick.onclick=()=>editor();
+  }
+  const timer=setInterval(()=>{if($('#dash')){clearInterval(timer);install()}},250);
+  window.openProjectCenter=render;
+  window.openGlobalProjectEditor=editor;
+})();
