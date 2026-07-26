@@ -54,9 +54,16 @@
     try{
       const [x,r,s]=await Promise.all([api('/api/dashboard'),api('/api/reports/summary'),api('/api/system/status')]);
       const totals={};r.currencies.forEach(c=>{if(c.status==='verified')totals[c.currency]=(Number(totals[c.currency]||0)+Number(c.total||0))});
-      dashContent.innerHTML=`<div class="welcome-card"><div><span class="tag dark">مركز التحكم العالمي</span><h3>بُنْيَان — لوحة التنفيذ والشفافية</h3><p>متابعة فورية للطلبات والمساهمات والمستندات وصحة النظام.</p></div><span class="system-live">● النظام يعمل</span></div>
+      dashContent.innerHTML=`<div class="dash-actions home-actions"><button class="primary" id="homeNewProject">+ إنشاء مشروع جديد</button><button class="outline dark-outline" id="homeManageProjects">إدارة المشروعات</button></div>
+      <div class="welcome-card"><div><span class="tag dark">مركز التحكم العالمي</span><h3>بُنْيَان — لوحة التنفيذ والشفافية</h3><p>متابعة فورية للطلبات والمساهمات والمستندات وصحة النظام.</p></div><span class="system-live">● النظام يعمل</span></div>
       <div class="kpis"><div class="kpi">المشروعات<strong>${x.projects}</strong></div><div class="kpi attention">طلبات جديدة<strong>${x.new_requests}</strong></div><div class="kpi">إجمالي المساهمات<strong>${r.donations_total}</strong></div><div class="kpi attention">بانتظار المراجعة<strong>${r.donations_pending}</strong></div><div class="kpi">مساهمات موثقة<strong>${r.donations_verified}</strong></div><div class="kpi">إشعارات تحويل<strong>${r.receipts_total}</strong></div></div>
       <section class="executive-grid"><article><h3>إجمالي المبالغ الموثقة</h3>${Object.keys(totals).length?Object.entries(totals).map(([currency,total])=>`<div class="money-row"><span>${esc(currency)}</span><strong>${Number(total).toLocaleString('en-GB')}</strong></div>`).join(''):'<p class="empty">لا توجد مساهمات موثقة بعد.</p>'}</article><article><h3>صحة النظام</h3><div class="health-row"><span>قاعدة البيانات</span><strong>${esc(s.database)}</strong></div><div class="health-row"><span>زمن الاستجابة</span><strong>${Number(s.totalLatencyMs)} ms</strong></div><div class="health-row"><span>الإصدار</span><strong>${esc(s.version)}</strong></div><div class="health-row"><span>آخر فحص</span><strong>${date(s.time)}</strong></div></article></section>`;
+      const projectButton=$('[data-view="projects"]');
+      $('#homeManageProjects').onclick=()=>projectButton?.click();
+      $('#homeNewProject').onclick=()=>{
+        projectButton?.click();
+        setTimeout(()=>document.querySelector('#proAdd')?.click(),500);
+      };
     }catch(err){showError(dashContent,err)}
   }
 
