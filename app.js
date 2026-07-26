@@ -1,56 +1,238 @@
-const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
-const API=window.BUNYAN_API_ORIGIN||'https://api.bunyan-sudan.org';
-const state={token:sessionStorage.getItem('bunyan_token')||'',projects:[],news:[],cache:{},filters:{}};
-const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-const date=v=>v?new Date(v).toLocaleString('ar-SD',{dateStyle:'medium',timeStyle:'short'}):'—';
-const statusLabels={new:'جديد',review:'قيد المراجعة',accepted:'مقبول',rejected:'مرفوض',completed:'مكتمل',pending:'قيد الانتظار',verified:'موثق'};
-const statusText=v=>statusLabels[v]||v||'—';
-const wa=v=>{let p=String(v||'').replace(/\D/g,'');if(p.startsWith('00'))p=p.slice(2);if(p.startsWith('0')&&p.length===10)p=`249${p.slice(1)}`;return p};
+const $ = s => document.querySelector(s);
+const API = window.BUNYAN_API_ORIGIN || 'https://api.bunyan-sudan.org';
+const state = { token: sessionStorage.getItem('bunyan_token') || '' };
 
-async function request(path,options={}){
-  const headers={'Content-Type':'application/json',...(options.headers||{})};
-  if(state.token)headers.Authorization=`Bearer ${state.token}`;
-  const res=await fetch(`${API}${path}`,{...options,headers});
-  const text=await res.text();let data=null;try{data=text?JSON.parse(text):null}catch{data={error:text}}
-  if(!res.ok)throw new Error(data?.error||`فشل الاتصال (${res.status})`);return data;
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const date = v => v ? new Date(v).toLocaleDateString('ar-SD') : '—';
+const statusLabels = { new: 'جديد', review: 'قيد النظر', approved: 'مقبول', rejected: 'مرفوض', done: 'مكتمل' };
+const statusText = v => statusLabels[v] || v || 'جديد';
+const wa = v => { let p = String(v || '').replace(/\D/g, ''); return p ? `https://wa.me/${p}` : ''; };
+
+// دالة الاتصال الشاملة والمطورة مع السيرفر
+async function request(path, options = {}) {
+  const headers = {};
+
+  // إضافة Authorization Token إن وجد
+  if (state.token) {
+    headers['Authorization'] = `Bearer ${state.token}`;
+  }
+
+  // إذا لم تكن البيانات مبعوثة كـ FormData، نضع JSON Content-Type تلقائياً
+  if (options.body && !(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+    if (typeof options.body === 'object') {
+      options.body = JSON.stringify(options.body);
+    }
+  }
+
+  const finalOptions = {
+    ...options,
+    headers: {
+      ...headers,
+      ...(options.headers || {})
+    }
+  };
+
+  try {
+    const res = await fetch(`${API}${path}`, finalOptions);
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch (e) { data = { message: text }; }
+
+    if (!res.ok) {
+      throw new Error(data?.error || data?.message || `خطأ في السيرفر (${res.status})`);
+    }
+    return data;
+  } catch (err) {
+    console.error(`[API Error] ${path}:`, err);
+    throw err;
+  }
 }
-function loading(el,msg='جارٍ التحميل...'){el.innerHTML=`<p class="empty">${msg}</p>`}
-function showError(el,err){el.innerHTML=`<p class="empty">تعذر الاتصال بالخادم: ${esc(err.message)}</p>`}
 
-async function loadPublic(){loading(projectGrid);loading(newsGrid);try{const [projects,news]=await Promise.all([request('/api/public/projects'),request('/api/public/news')]);state.projects=projects;state.news=news;renderProjects();renderNews()}catch(err){showError(projectGrid,err);showError(newsGrid,err)}}
-function renderProjects(){projectGrid.innerHTML=state.projects.length?state.projects.map(p=>`<article><span class="status">${esc(statusText(p.status))}</span><h3>${esc(p.name)}</h3><p>${esc(p.summary)}</p><div class="progress"><i style="width:${Math.max(0,Math.min(100,Number(p.progress)||0))}%"></i></div><div class="meta"><span>الإنجاز ${Number(p.progress)||0}%</span><span>${Number(p.beneficiaries_target)||0} مستفيد</span></div></article>`).join(''):'<p class="empty">لا توجد مشروعات منشورة بعد.</p>'}
-function renderNews(){newsGrid.innerHTML=state.news.length?state.news.map(n=>`<article><span class="status">${date(n.published_at||n.created_at)}</span><h3>${esc(n.title)}</h3><p>${esc(n.body)}</p></article>`).join(''):'<p class="empty">لا توجد أخبار منشورة بعد.</p>'}
+function loading(el, msg = 'جاري التحميل...') {
+  if (el) el.innerHTML = `<div class="loading">${msg}</div>`;
+}
 
-menu.onclick=()=>nav.classList.toggle('open');$$('nav a').forEach(a=>a.onclick=()=>nav.classList.remove('open'));
-adminBtn.onclick=()=>login.classList.add('show');close.onclick=()=>login.classList.remove('show');site.onclick=()=>dash.classList.remove('show');
-logout.onclick=()=>{state.token='';sessionStorage.removeItem('bunyan_token');dash.classList.remove('show')};
-loginForm.onsubmit=async e=>{e.preventDefault();loginMsg.textContent='جارٍ تسجيل الدخول...';const f=new FormData(e.target);try{const data=await request('/api/auth/login',{method:'POST',body:JSON.stringify({email:f.get('email'),password:f.get('password')})});state.token=data.token;sessionStorage.setItem('bunyan_token',data.token);login.classList.remove('show');dash.classList.add('show');await view('home');loginMsg.textContent=''}catch(err){loginMsg.textContent=err.message}};
-setupAdmin.onclick=async()=>{const f=new FormData(loginForm),name=String(f.get('name')||'').trim();if(name.length<2){loginMsg.textContent='اكتب اسم المدير أولاً.';return}loginMsg.textContent='جارٍ إنشاء أول مدير...';try{const data=await request('/api/setup',{method:'POST',body:JSON.stringify({name,email:f.get('email'),password:f.get('password')})});state.token=data.token;sessionStorage.setItem('bunyan_token',data.token);login.classList.remove('show');dash.classList.add('show');await view('home')}catch(err){loginMsg.textContent=err.message}};
-joinForm.onsubmit=async e=>{e.preventDefault();joinMsg.textContent='جارٍ الإرسال...';const body=Object.fromEntries(new FormData(e.target));try{await request('/api/public/participation-requests',{method:'POST',body:JSON.stringify(body)});e.target.reset();joinMsg.textContent='تم استلام طلبك وحفظه في النظام بنجاح.'}catch(err){joinMsg.textContent=err.message}};
-donateBtn.onclick=()=>donateModal.classList.add('show');closeDonate.onclick=()=>donateModal.classList.remove('show');
-donateForm.onsubmit=async e=>{e.preventDefault();donateMsg.textContent='جارٍ التسجيل...';const body=Object.fromEntries(new FormData(e.target));body.amount=Number(body.amount);Object.keys(body).forEach(k=>body[k]===''&&delete body[k]);try{await request('/api/public/donations',{method:'POST',body:JSON.stringify(body)});e.target.reset();donateMsg.textContent='تم تسجيل المساهمة بنجاح.';setTimeout(()=>donateModal.classList.remove('show'),900)}catch(err){donateMsg.textContent=err.message}};
+function showError(el, err) {
+  if (el) el.innerHTML = `<div class="error-msg">${esc(err.message || err)}</div>`;
+}
 
-$$('[data-view]').forEach(b=>b.onclick=()=>view(b.dataset.view));
-const defs={
- beneficiaries:{title:'المستفيدون',cols:[['name','الاسم'],['phone','الهاتف'],['service','الخدمة'],['status','الحالة']],fields:[['name','الاسم'],['phone','الهاتف'],['service','الخدمة'],['status','الحالة']]},
- volunteers:{title:'المتطوعون',cols:[['name','الاسم'],['phone','الهاتف'],['skill','المهارة'],['hours','الساعات'],['status','الحالة']],fields:[['name','الاسم'],['phone','الهاتف'],['skill','المهارة'],['hours','الساعات'],['status','الحالة']]},
- donations:{title:'التبرعات',cols:[['donor','المتبرع'],['amount','المبلغ'],['currency','العملة'],['project_name','المشروع'],['method','الدفع'],['status','الحالة']],fields:[['donor','المتبرع'],['phone','الهاتف'],['amount','المبلغ'],['currency','العملة'],['project_name','المشروع'],['method','الدفع'],['reference','المرجع'],['status','الحالة']]},
- news:{title:'الأخبار',cols:[['title','العنوان'],['published_at','تاريخ النشر'],['is_public','منشور']],fields:[['title','العنوان'],['body','النص'],['published_at','تاريخ النشر بصيغة 2026-07-25T12:00:00Z'],['is_public','منشور؟ true أو false']]},
- requests:{title:'طلبات المشاركة',cols:[['name','الاسم'],['phone','الهاتف'],['role','المشاركة'],['status','الحالة'],['created_at','التاريخ']],fields:[]}
-};
-async function fetchRows(type){const rows=await request(`/api/${type}`);state.cache[type]=rows;return rows}
-function cell(k,v){if(k.includes('_at'))return date(v);if(k==='status')return `<span class="status-pill s-${esc(v||'new')}">${esc(statusText(v))}</span>`;if(typeof v==='boolean')return v?'نعم':'لا';return esc(v)}
-function contactButtons(row){if(!row.phone)return'';const p=wa(row.phone);return `<a class="mini contact" href="tel:${esc(row.phone)}">اتصال</a>${p?`<a class="mini whatsapp" target="_blank" rel="noopener" href="https://wa.me/${p}">واتساب</a>`:''}`}
-function filterRows(type,rows){const f=state.filters[type]||{};const q=String(f.q||'').toLowerCase();return rows.filter(r=>{const text=Object.values(r).join(' ').toLowerCase();return(!q||text.includes(q))&&(!f.status||r.status===f.status)})}
-function toolbar(type,rows){const statuses=[...new Set(rows.map(r=>r.status).filter(Boolean))];return `<div class="dash-toolbar"><div class="search-box"><input id="tableSearch" placeholder="ابحث بالاسم أو الهاتف أو التفاصيل" value="${esc(state.filters[type]?.q||'')}"></div>${['requests','donations'].includes(type)?`<select id="statusFilter"><option value="">كل الحالات</option>${statuses.map(s=>`<option value="${esc(s)}" ${state.filters[type]?.status===s?'selected':''}>${esc(statusText(s))}</option>`).join('')}</select>`:''}<span class="count-badge">${filterRows(type,rows).length} سجل</span></div>`}
-async function tableView(type){const d=defs[type];dashTitle.textContent=d.title;loading(dashContent);try{const rows=await fetchRows(type);renderTable(type,rows)}catch(err){showError(dashContent,err)}}
-function renderTable(type,rows){const d=defs[type],filtered=filterRows(type,rows);dashContent.innerHTML=`<div class="dash-actions">${type!=='requests'?'<button class="primary" id="addRecord">إضافة سجل</button>':''}</div>${toolbar(type,rows)}<div class="table"><table><tr>${d.cols.map(c=>`<th>${c[1]}</th>`).join('')}<th>إجراءات</th></tr>${filtered.length?filtered.map(r=>`<tr>${d.cols.map(c=>`<td>${cell(c[0],r[c[0]])}</td>`).join('')}<td><div class="row-actions">${contactButtons(r)}${type==='requests'?`<select class="status-select" data-status-id="${esc(r.id)}"><option value="new" ${r.status==='new'?'selected':''}>جديد</option><option value="review" ${r.status==='review'?'selected':''}>قيد المراجعة</option><option value="accepted" ${r.status==='accepted'?'selected':''}>مقبول</option><option value="rejected" ${r.status==='rejected'?'selected':''}>مرفوض</option><option value="completed" ${r.status==='completed'?'selected':''}>مكتمل</option></select>`:''}<button class="danger mini" data-delete="${esc(r.id)}">حذف</button></div></td></tr>`).join(''):`<tr><td class="empty" colspan="${d.cols.length+1}">لا توجد نتائج مطابقة.</td></tr>`}</table></div>`;if(type!=='requests')$('#addRecord').onclick=()=>add(type);$('#tableSearch').oninput=e=>{state.filters[type]={...(state.filters[type]||{}),q:e.target.value};renderTable(type,rows)};const sf=$('#statusFilter');if(sf)sf.onchange=e=>{state.filters[type]={...(state.filters[type]||{}),status:e.target.value};renderTable(type,rows)};$$('[data-delete]').forEach(b=>b.onclick=()=>removeRecord(type,b.dataset.delete));$$('[data-status-id]').forEach(s=>s.onchange=()=>changeRequestStatus(s.dataset.statusId,s.value))}
-async function changeRequestStatus(id,status){try{await request(`/api/requests/${id}`,{method:'PATCH',body:JSON.stringify({status})});await tableView('requests');await refreshDashboardSilently()}catch(err){alert(err.message)}}
-async function add(type){const d=defs[type],body={};for(const [k,l] of d.fields){const v=prompt(l);if(v===null)return;body[k]=['amount','hours'].includes(k)?Number(v||0):k==='is_public'?v.toLowerCase()!=='false':v}try{await request(`/api/${type}`,{method:'POST',body:JSON.stringify(body)});if(type==='news')await loadPublic();await tableView(type)}catch(err){alert(err.message)}}
-async function removeRecord(type,id){if(!confirm('حذف السجل؟'))return;try{await request(`/api/${type}/${id}`,{method:'DELETE'});if(type==='news')await loadPublic();await tableView(type)}catch(err){alert(err.message)}}
-async function projectView(){dashTitle.textContent='المشروعات';loading(dashContent);try{const rows=await fetchRows('projects');dashContent.innerHTML=`<div class="dash-actions"><button class="primary" id="addProject">إضافة مشروع</button><span class="count-badge">${rows.length} مشروع</span></div><div class="project-admin-grid">${rows.length?rows.map(x=>`<article class="project-admin-card"><div><span class="status-pill">${esc(statusText(x.status))}</span><h3>${esc(x.name)}</h3><p>${esc(x.summary||'')}</p></div><div class="progress"><i style="width:${Math.max(0,Math.min(100,Number(x.progress)||0))}%"></i></div><div class="meta"><span>${Number(x.progress)||0}% إنجاز</span><span>${Number(x.beneficiaries_target)||0} مستفيد</span></div><button class="danger mini" data-project-delete="${esc(x.id)}">حذف</button></article>`).join(''):'<p class="empty">لا توجد مشروعات بعد.</p>'}</div>`;addProject.onclick=async()=>{const name=prompt('اسم المشروع');if(!name)return;const body={name,summary:prompt('الملخص')||'',status:prompt('الحالة','قيد التخطيط')||'قيد التخطيط',progress:Number(prompt('الإنجاز','0'))||0,beneficiaries_target:Number(prompt('المستفيدون المستهدفون','0'))||0,is_public:true};try{await request('/api/projects',{method:'POST',body:JSON.stringify(body)});await loadPublic();await projectView()}catch(err){alert(err.message)}};$$('[data-project-delete]').forEach(b=>b.onclick=()=>removeProject(b.dataset.projectDelete))}catch(err){showError(dashContent,err)}}
-async function removeProject(id){if(!confirm('حذف المشروع؟'))return;try{await request(`/api/projects/${id}`,{method:'DELETE'});await loadPublic();await projectView()}catch(err){alert(err.message)}}
-async function refreshDashboardSilently(){try{state.cache.dashboard=await request('/api/dashboard')}catch{}}
-async function view(v){$$('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===v));if(v==='home'){dashTitle.textContent='نظرة عامة';loading(dashContent);try{const x=await request('/api/dashboard');dashContent.innerHTML=`<div class="welcome-card"><div><span class="tag dark">مركز التحكم</span><h3>لوحة بُنْيَان التنفيذية</h3><p>تابع المشروعات والطلبات والتبرعات من مكان واحد.</p></div><button class="outline" onclick="loadPublic();dash.classList.remove('show')">تحديث الموقع</button></div><div class="kpis"><div class="kpi">المشروعات<strong>${x.projects}</strong></div><div class="kpi">المستفيدون<strong>${x.beneficiaries}</strong></div><div class="kpi">المتطوعون<strong>${x.volunteers}</strong></div><div class="kpi">التبرعات<strong>${x.donations}</strong></div><div class="kpi">الطلبات<strong>${x.requests}</strong></div><div class="kpi attention">طلبات جديدة<strong>${x.new_requests}</strong></div></div>`}catch(err){showError(dashContent,err)};return}if(v==='projects')return projectView();return tableView(v)}
-backup.onclick=()=>{const blob=new Blob([JSON.stringify({generatedAt:new Date().toISOString(),cache:state.cache},null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`bunyan-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href)};
-loadPublic();
+// تحميل المشاريع والأخبار للواجهة العامة
+async function loadPublic() {
+  renderProjects();
+  renderNews();
+}
+
+async function renderProjects() {
+  const grid = $('#projectGrid');
+  if (!grid) return;
+  try {
+    const projects = await request('/api/projects');
+    if (projects && projects.length > 0) {
+      grid.innerHTML = projects.map(p => `
+        <article class="card">
+          <span class="badge">${esc(p.category || 'مبادرة')}</span>
+          <h3>${esc(p.title)}</h3>
+          <p>${esc(p.description)}</p>
+          <button class="primary donate-trigger" onclick="openDonateModal('${esc(p.title)}')">ساهم في المشروع</button>
+        </article>
+      `).join('');
+    }
+  } catch (e) {
+    console.log('استخدام البيانات الافتراضية للمشاريع');
+  }
+}
+
+async function renderNews() {
+  const grid = $('#newsGrid');
+  if (!grid) return;
+  try {
+    const news = await request('/api/news');
+    if (news && news.length > 0) {
+      grid.innerHTML = news.map(n => `
+        <article class="card">
+          <h3>${esc(n.title)}</h3>
+          <p>${esc(n.content)}</p>
+          <small>${date(n.created_at)}</small>
+        </article>
+      `).join('');
+    }
+  } catch (e) {
+    console.log('استخدام البيانات الافتراضية للأخبار');
+  }
+}
+
+// الأحداث والتفاعل
+document.addEventListener('DOMContentLoaded', () => {
+  loadPublic();
+
+  // القائمة والتنقل
+  const menu = $('#menu');
+  const nav = $('#nav');
+  if (menu && nav) {
+    menu.onclick = () => nav.classList.toggle('open');
+  }
+
+  // لوحة الإدارة والدخول
+  const adminBtn = $('#adminBtn');
+  const loginModal = $('#login');
+  const closeLogin = $('#close');
+  if (adminBtn && loginModal) adminBtn.onclick = () => loginModal.classList.add('open');
+  if (closeLogin && loginModal) closeLogin.onclick = () => loginModal.classList.remove('open');
+
+  const logoutBtn = $('#logout');
+  if (logoutBtn) {
+    logoutBtn.onclick = () => {
+      state.token = '';
+      sessionStorage.removeItem('bunyan_token');
+      location.reload();
+    };
+  }
+
+  // نموذج الدخول
+  const loginForm = $('#loginForm');
+  if (loginForm) {
+    loginForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const msg = $('#loginMsg');
+      const formData = new FormData(loginForm);
+      const body = Object.fromEntries(formData.entries());
+
+      try {
+        if (msg) msg.textContent = 'جاري التحقق...';
+        const res = await request('/api/admin/login', { method: 'POST', body });
+        state.token = res.token;
+        sessionStorage.setItem('bunyan_token', res.token);
+        if (loginModal) loginModal.classList.remove('open');
+        $('#dash').classList.add('open');
+      } catch (err) {
+        if (msg) msg.textContent = err.message || 'فشل تسجيل الدخول';
+      }
+    };
+  }
+
+  // نموذج التواصل (Contact Form)
+  const contactForm = $('#contactForm');
+  if (contactForm) {
+    contactForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const msg = $('#contactMsg');
+      const formData = new FormData(contactForm);
+
+      try {
+        if (msg) msg.textContent = 'جاري الإرسال...';
+        await request('/api/contact', {
+          method: 'POST',
+          body: formData
+        });
+        if (msg) msg.textContent = 'تم إرسال رسالتك بنجاح! شكراً لتواصلك.';
+        contactForm.reset();
+      } catch (err) {
+        if (msg) msg.textContent = 'تعذر إرسال الرسالة، يرجى المحاولة لاحقاً.';
+      }
+    };
+  }
+
+  // نموذج طلبات المشاركة والتطوع
+  const joinForm = $('#joinForm');
+  if (joinForm) {
+    joinForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const msg = $('#joinMsg');
+      const formData = new FormData(joinForm);
+
+      try {
+        if (msg) msg.textContent = 'جاري الإرسال...';
+        await request('/api/join', {
+          method: 'POST',
+          body: formData
+        });
+        if (msg) msg.textContent = 'تم إرسال طلبك بنجاح!';
+        joinForm.reset();
+      } catch (err) {
+        if (msg) msg.textContent = 'حدث خطأ أثناء إرسال الطلب.';
+      }
+    };
+  }
+
+  // نموذج التبرع والمساهمة (Donate Form)
+  const donateForm = $('#donateForm');
+  const donateModal = $('#donateModal');
+  const donateBtn = $('#donateBtn');
+  const closeDonate = $('#closeDonate');
+
+  if (donateBtn && donateModal) donateBtn.onclick = () => donateModal.classList.add('open');
+  if (closeDonate && donateModal) closeDonate.onclick = () => donateModal.classList.remove('open');
+
+  window.openDonateModal = (projectName) => {
+    if (donateModal) {
+      const pInput = donateForm ? donateForm.querySelector('[name="projectName"]') : null;
+      if (pInput) pInput.value = projectName;
+      donateModal.classList.add('open');
+    }
+  };
+
+  if (donateForm) {
+    donateForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const msg = $('#donateMsg');
+      const formData = new FormData(donateForm);
+
+      try {
+        if (msg) msg.textContent = 'جاري تسجيل المساهمة وإرفاق الإشعار...';
+        await request('/api/donations', {
+          method: 'POST',
+          body: formData
+        });
+        if (msg) msg.textContent = 'تم حفظ المساهمة بنجاح، شكراً لدعمك!';
+        setTimeout(() => {
+          if (donateModal) donateModal.classList.remove('open');
+          donateForm.reset();
+          if (msg) msg.textContent = '';
+        }, 2000);
+      } catch (err) {
+        if (msg) msg.textContent = err.message || 'حدث خطأ في حفظ المساهمة.';
+      }
+    };
+  }
+});
