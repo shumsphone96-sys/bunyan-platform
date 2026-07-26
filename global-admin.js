@@ -26,19 +26,11 @@
     throw last||new Error('تعذر الاتصال بالخادم');
   }
 
-  const labels={
-    projects:{title:'إدارة المشروعات',add:'مشروع جديد'},
-    news:{title:'إدارة الأخبار',add:'خبر جديد'}
-  };
+  const labels={projects:{title:'إدارة المشروعات',add:'مشروع جديد'},news:{title:'إدارة الأخبار',add:'خبر جديد'}};
 
   function projectCard(p){
     const progress=Math.max(0,Math.min(100,Number(p.progress||0)));
-    return `<article class="pro-card">
-      <div class="pro-card-top"><span class="pro-status">${esc(p.status||'جديد')}</span><span class="pro-public ${p.is_public?'on':''}">${p.is_public?'منشور':'مسودة'}</span></div>
-      <h3>${esc(p.name||'بدون اسم')}</h3><p>${esc(p.summary||'لا يوجد وصف')}</p>
-      <div class="pro-progress"><i style="width:${progress}%"></i></div><small>نسبة الإنجاز: ${progress}%</small>
-      <div class="pro-actions"><button data-edit-project="${p.id}" class="pro-btn">تعديل</button><button data-delete-project="${p.id}" class="pro-btn danger">حذف</button></div>
-    </article>`;
+    return `<article class="pro-card"><div class="pro-card-top"><span class="pro-status">${esc(p.status||'جديد')}</span><span class="pro-public ${p.is_public?'on':''}">${p.is_public?'منشور':'مسودة'}</span></div><h3>${esc(p.name||'بدون اسم')}</h3><p>${esc(p.summary||'لا يوجد وصف')}</p><div class="pro-progress"><i style="width:${progress}%"></i></div><small>نسبة الإنجاز: ${progress}%</small><div class="pro-actions"><button data-edit-project="${p.id}" class="pro-btn">تعديل</button><button data-delete-project="${p.id}" class="pro-btn danger">حذف</button></div></article>`;
   }
 
   function newsCard(n){return `<article class="pro-card"><div class="pro-card-top"><span class="pro-status">${n.is_public?'منشور':'مسودة'}</span></div><h3>${esc(n.title||'بدون عنوان')}</h3><p>${esc(n.body||'لا يوجد محتوى')}</p><small>${n.published_at?new Date(n.published_at).toLocaleString('ar-SD'):'غير منشور'}</small><div class="pro-actions"><button data-edit-news="${n.id}" class="pro-btn">تعديل</button><button data-delete-news="${n.id}" class="pro-btn danger">حذف</button></div></article>`}
@@ -66,5 +58,22 @@
 
   async function removeItem(type,id){if(!confirm('هل تريد حذف هذا السجل نهائياً؟'))return;try{await api(`/api/${type}/${id}`,{method:'DELETE'});renderManager(type)}catch(e){alert(e.message)}}
 
-  const timer=setInterval(()=>{const dash=$('#dash');if(!dash)return;clearInterval(timer);const p=$('[data-view="projects"]'),n=$('[data-view="news"]');if(p)p.onclick=()=>renderManager('projects');if(n)n.onclick=()=>renderManager('news')},300);
+  function installQuickAction(){
+    const content=$('#dashContent');
+    if(!content||$('#quickNewProject'))return;
+    const bar=document.createElement('div');
+    bar.className='global-quick-actions';
+    bar.innerHTML='<button id="quickNewProject" class="primary">+ إنشاء مشروع جديد</button><button id="quickManageProjects" class="pro-btn">إدارة المشروعات</button>';
+    content.prepend(bar);
+    $('#quickNewProject').onclick=()=>openEditor('projects');
+    $('#quickManageProjects').onclick=()=>renderManager('projects');
+  }
+
+  const timer=setInterval(()=>{
+    const dash=$('#dash');if(!dash)return;
+    const p=$('[data-view="projects"]'),n=$('[data-view="news"]');
+    if(p)p.onclick=()=>renderManager('projects');
+    if(n)n.onclick=()=>renderManager('news');
+    if(dash.classList.contains('open'))installQuickAction();
+  },400);
 })();
