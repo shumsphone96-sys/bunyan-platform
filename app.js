@@ -2,6 +2,19 @@ const $ = s => document.querySelector(s);
 const API = window.BUNYAN_API_ORIGIN || 'https://api.bunyan-sudan.org';
 const state = { token: sessionStorage.getItem('bunyan_token') || '' };
 
+// ربط دالة فتح نافذة التبرع لتعمل من أي مكان في الصفحة
+window.openDonateModal = function(projectName) {
+  const modal = document.getElementById('donateModal');
+  const projectInput = document.querySelector('#donateForm [name="projectName"]');
+  if (projectInput && projectName) {
+    projectInput.value = projectName;
+  }
+  if (modal) {
+    modal.classList.add('open');
+    modal.style.display = 'flex';
+  }
+};
+
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const date = v => v ? new Date(v).toLocaleDateString('ar-SD') : '—';
 const statusLabels = { new: 'جديد', review: 'قيد النظر', approved: 'مقبول', rejected: 'مرفوض', done: 'مكتمل' };
@@ -201,15 +214,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const donateBtn = $('#donateBtn');
   const closeDonate = $('#closeDonate');
 
-  if (donateBtn && donateModal) donateBtn.onclick = () => donateModal.classList.add('open');
-  if (closeDonate && donateModal) closeDonate.onclick = () => donateModal.classList.remove('open');
-
-  window.openDonateModal = (projectName) => {
-    if (donateModal) {
-      const pInput = donateForm ? donateForm.querySelector('[name="projectName"]') : null;
-      if (pInput) pInput.value = projectName;
-      donateModal.classList.add('open');
-    }
+  if (donateBtn && donateModal) donateBtn.onclick = () => window.openDonateModal();
+  if (closeDonate && donateModal) closeDonate.onclick = () => {
+    donateModal.classList.remove('open');
+    donateModal.style.display = 'none';
   };
 
   if (donateForm) {
@@ -226,7 +234,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         if (msg) msg.textContent = 'تم حفظ المساهمة بنجاح، شكراً لدعمك!';
         setTimeout(() => {
-          if (donateModal) donateModal.classList.remove('open');
+          if (donateModal) {
+            donateModal.classList.remove('open');
+            donateModal.style.display = 'none';
+          }
           donateForm.reset();
           if (msg) msg.textContent = '';
         }, 2000);
