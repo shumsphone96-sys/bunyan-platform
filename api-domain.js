@@ -29,12 +29,13 @@
     document.head.appendChild(script);
   };
 
-  const release='20260727-project-cover-3';
+  const release='20260727-project-operations-1';
   loadStyle(`./project-center.css?v=${release}`,'project-center-style');
   loadStyle(`./financial-center.css?v=${release}`,'financial-center-style');
   loadStyle(`./global-suite.css?v=${release}`,'global-suite-style');
   loadStyle(`./project-transparency.css?v=${release}`,'project-transparency-style');
   loadStyle(`./completion-suite.css?v=${release}`,'completion-suite-style');
+  loadStyle(`./project-operations.css?v=${release}`,'project-operations-style');
   loadScript(`./global-upgrade.js?v=${release}`,'global-manager');
   loadScript(`./quick-project.js?v=${release}`,'quick-project');
   loadScript(`./project-center.js?v=${release}`,'project-center');
@@ -43,4 +44,5 @@
   loadScript(`./global-suite.js?v=${release}`,'global-suite');
   loadScript(`./project-transparency.js?v=${release}`,'project-transparency');
   loadScript(`./completion-suite.js?v=${release}`,'completion-suite');
+  loadScript(`./project-operations.js?v=${release}`,'project-operations');
 })();
