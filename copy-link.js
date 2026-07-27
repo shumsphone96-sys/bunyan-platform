@@ -72,12 +72,18 @@
     });
   }
 
+  function previewProjectId(preview){
+    const title=preview.querySelector('h2')?.textContent.trim();
+    if(!title)return '';
+    const card=[...document.querySelectorAll('.pc-card')].find(item=>item.querySelector('h3')?.textContent.trim()===title);
+    return card?.querySelector('[data-preview]')?.dataset.preview||card?.querySelector('[data-edit]')?.dataset.edit||'';
+  }
+
   function enhancePreview(root=document){
     root.querySelectorAll('.pc-preview').forEach(preview=>{
       if(preview.querySelector('.copy-btn'))return;
-      const projectId=document.querySelector('.pc-card [data-preview]')?.dataset.preview||'';
       const donate=preview.querySelector('#pcDonate');
-      const button=makeButton(projectId,'نسخ رابط المشروع');
+      const button=makeButton(previewProjectId(preview),'نسخ رابط المشروع');
       button.classList.add('copy-btn-wide');
       if(donate)donate.insertAdjacentElement('afterend',button);
       else preview.appendChild(button);
