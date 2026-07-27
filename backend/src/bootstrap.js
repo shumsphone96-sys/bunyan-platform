@@ -1,1 +1,1 @@
-await import('./server-v7.js');
+await import('./server-v8.js');
