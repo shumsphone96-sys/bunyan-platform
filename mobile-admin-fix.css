@@ -1,0 +1,30 @@
+html[dir="rtl"],body.bunyan-rtl{direction:rtl;text-align:right}
+body.bunyan-rtl *{box-sizing:border-box}
+body.bunyan-rtl .bunyan-mobile-tabs{direction:rtl}
+@media(max-width:760px){
+  body.bunyan-rtl{overflow-x:hidden}
+  body.bunyan-rtl header nav,
+  body.bunyan-rtl .top-nav,
+  body.bunyan-rtl .tabs,
+  body.bunyan-rtl [role="tablist"]{display:flex!important;gap:10px!important;overflow-x:auto!important;overscroll-behavior-inline:contain;scroll-snap-type:x proximity;padding:10px 14px!important;white-space:nowrap!important;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  body.bunyan-rtl header nav::-webkit-scrollbar,
+  body.bunyan-rtl .top-nav::-webkit-scrollbar,
+  body.bunyan-rtl .tabs::-webkit-scrollbar,
+  body.bunyan-rtl [role="tablist"]::-webkit-scrollbar{display:none}
+  body.bunyan-rtl header nav>* ,
+  body.bunyan-rtl .top-nav>* ,
+  body.bunyan-rtl .tabs>* ,
+  body.bunyan-rtl [role="tablist"]>*{flex:0 0 auto;scroll-snap-align:start}
+  body.bunyan-rtl .bunyan-page-heading{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;flex-wrap:wrap!important;padding-inline:20px!important}
+  body.bunyan-rtl .bunyan-page-heading h1,
+  body.bunyan-rtl .bunyan-page-heading h2{margin:0!important}
+  body.bunyan-rtl .bunyan-page-heading button,
+  body.bunyan-rtl .bunyan-page-heading a{white-space:nowrap!important}
+  body.bunyan-rtl .bunyan-floating-action{position:static!important;inset:auto!important;transform:none!important;width:100%!important;max-width:none!important;margin:10px 0!important;display:flex!important;align-items:center!important;justify-content:center!important;box-shadow:none!important;z-index:auto!important}
+  body.bunyan-rtl .bunyan-action-host{display:grid!important;grid-template-columns:1fr!important;gap:10px!important;width:100%!important;margin:14px 0!important;padding:0!important}
+  body.bunyan-rtl .bunyan-language-button{direction:rtl!important;text-align:center!important;unicode-bidi:plaintext!important;white-space:normal!important;line-height:1.5!important}
+  body.bunyan-rtl main,
+  body.bunyan-rtl #dashContent,
+  body.bunyan-rtl .content,
+  body.bunyan-rtl .settings-content{min-width:0!important;overflow:visible!important}
+}
