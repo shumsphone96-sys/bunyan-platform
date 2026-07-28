@@ -29,7 +29,7 @@
     document.head.appendChild(script);
   };
 
-  const release='20260728-public-project-pages-1';
+  const release='20260728-sudan-project-map-1';
   loadStyle(`./project-center.css?v=${release}`,'project-center-style');
   loadStyle(`./financial-center.css?v=${release}`,'financial-center-style');
   loadStyle(`./global-suite.css?v=${release}`,'global-suite-style');
@@ -41,6 +41,7 @@
   loadStyle(`./i18n-global.css?v=${release}`,'i18n-global-style');
   loadStyle(`./impact-upgrade.css?v=${release}`,'impact-upgrade-style');
   loadStyle(`./public-project-page.css?v=${release}`,'public-project-page-style');
+  loadStyle(`./project-map.css?v=${release}`,'project-map-style');
   loadScript(`./global-upgrade.js?v=${release}`,'global-manager');
   loadScript(`./quick-project.js?v=${release}`,'quick-project');
   loadScript(`./project-center.js?v=${release}`,'project-center');
@@ -56,4 +57,6 @@
   loadScript(`./impact-upgrade.js?v=${release}`,'impact-upgrade');
   loadScript(`./finance-transparency.js?v=${release}`,'finance-transparency');
   loadScript(`./public-project-page.js?v=${release}`,'public-project-page');
+  loadScript(`./project-map.js?v=${release}`,'project-map');
+  loadScript(`./project-geo-admin.js?v=${release}`,'project-geo-admin');
 })();
