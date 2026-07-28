@@ -29,7 +29,7 @@
     document.head.appendChild(script);
   };
 
-  const release='20260728-verified-expense-workflow-1';
+  const release='20260728-public-project-pages-1';
   loadStyle(`./project-center.css?v=${release}`,'project-center-style');
   loadStyle(`./financial-center.css?v=${release}`,'financial-center-style');
   loadStyle(`./global-suite.css?v=${release}`,'global-suite-style');
@@ -40,6 +40,7 @@
   loadStyle(`./mobile-admin-fix.css?v=${release}`,'mobile-admin-fix-style');
   loadStyle(`./i18n-global.css?v=${release}`,'i18n-global-style');
   loadStyle(`./impact-upgrade.css?v=${release}`,'impact-upgrade-style');
+  loadStyle(`./public-project-page.css?v=${release}`,'public-project-page-style');
   loadScript(`./global-upgrade.js?v=${release}`,'global-manager');
   loadScript(`./quick-project.js?v=${release}`,'quick-project');
   loadScript(`./project-center.js?v=${release}`,'project-center');
@@ -54,4 +55,5 @@
   loadScript(`./i18n-global.js?v=${release}`,'i18n-global');
   loadScript(`./impact-upgrade.js?v=${release}`,'impact-upgrade');
   loadScript(`./finance-transparency.js?v=${release}`,'finance-transparency');
+  loadScript(`./public-project-page.js?v=${release}`,'public-project-page');
 })();
