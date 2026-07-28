@@ -29,7 +29,7 @@
     document.head.appendChild(script);
   };
 
-  const release='20260728-bilingual-dashboard-complete-1';
+  const release='20260728-impact-transparency-1';
   loadStyle(`./project-center.css?v=${release}`,'project-center-style');
   loadStyle(`./financial-center.css?v=${release}`,'financial-center-style');
   loadStyle(`./global-suite.css?v=${release}`,'global-suite-style');
@@ -39,6 +39,7 @@
   loadStyle(`./copy-link.css?v=${release}`,'copy-link-style');
   loadStyle(`./mobile-admin-fix.css?v=${release}`,'mobile-admin-fix-style');
   loadStyle(`./i18n-global.css?v=${release}`,'i18n-global-style');
+  loadStyle(`./impact-upgrade.css?v=${release}`,'impact-upgrade-style');
   loadScript(`./global-upgrade.js?v=${release}`,'global-manager');
   loadScript(`./quick-project.js?v=${release}`,'quick-project');
   loadScript(`./project-center.js?v=${release}`,'project-center');
@@ -51,4 +52,5 @@
   loadScript(`./copy-link.js?v=${release}`,'copy-link');
   loadScript(`./mobile-admin-fix.js?v=${release}`,'mobile-admin-fix');
   loadScript(`./i18n-global.js?v=${release}`,'i18n-global');
+  loadScript(`./impact-upgrade.js?v=${release}`,'impact-upgrade');
 })();
