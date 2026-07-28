@@ -2,6 +2,24 @@
   const $=(s,r=document)=>r.querySelector(s);
   const $$=(s,r=document)=>[...r.querySelectorAll(s)];
   const esc=(v='')=>String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+  const origins=window.BUNYAN_API_ORIGINS||[window.BUNYAN_API_ORIGIN||'https://api.bunyan-sudan.org','https://bunyan-api-qhkf.onrender.com'];
+  const money=(value,currency)=>`${Number(value||0).toLocaleString('en-GB')} ${esc(currency||'')}`;
+  const dateText=value=>value?new Date(value).toLocaleString('ar-SD',{dateStyle:'medium',timeStyle:'short'}):'لم يُنشر بعد';
+
+  async function publicApi(path){
+    let last;
+    for(const base of origins){
+      try{
+        const response=await fetch(base+path,{cache:'no-store',headers:{Accept:'application/json'}});
+        const text=await response.text();
+        let data={};
+        try{data=text?JSON.parse(text):{}}catch{data={message:text}}
+        if(!response.ok)throw new Error(data.error||data.message||`فشل الطلب (${response.status})`);
+        return data;
+      }catch(error){last=error}
+    }
+    throw last||new Error('تعذر الاتصال بالخادم');
+  }
 
   const insertNavLinks=()=>{
     const nav=$('#nav');
@@ -39,7 +57,7 @@
         <article class="impact-metric" data-mode="target"><small>المستفيدون المستهدفون</small><strong>1000+</strong><span>تقدير أولي للخطة</span></article>
         <article class="impact-metric" data-mode="verified"><small>المشروعات المكتملة</small><strong>قيد التوثيق</strong><span>لن يُنشر رقم قبل اعتماده</span></article>
         <article class="impact-metric" data-mode="verified"><small>المستفيدون الموثقون</small><strong>قيد التوثيق</strong><span>بحسب سجلات المشروعات</span></article>
-        <article class="impact-metric" data-mode="verified"><small>المساهمات المؤكدة</small><strong>قيد التوثيق</strong><span>بعد مطابقة إشعارات الدفع</span></article>
+        <article class="impact-metric" data-mode="verified"><small>المساهمات المؤكدة</small><strong id="verifiedDonationCount">قيد التحميل</strong><span id="verifiedDonationHint">بعد مطابقة إشعارات الدفع</span></article>
         <article class="impact-metric" data-mode="verified"><small>ساعات التطوع</small><strong>قيد التوثيق</strong><span>بعد اعتماد تقارير الفرق</span></article>
       </div>`;
     projects.before(section);
@@ -60,17 +78,49 @@
     section.innerHTML=`
       <div class="transparency-section__head">
         <div><span class="transparency-badge">الشفافية العامة</span><h2>أين يذهب الدعم؟</h2></div>
-        <p>هذه اللوحة مخصصة لنشر المساهمات المؤكدة والمصروفات الموثقة وتقدم المشروعات. لا تُعرض أي قيمة مالية قبل مطابقتها واعتمادها.</p>
+        <p>تعرض هذه اللوحة المساهمات التي اعتمدتها الإدارة فقط، دون نشر أسماء أو أرقام هواتف المساهمين. المصروفات لا تُنشر إلا بعد إرفاق مستند واعتمادها.</p>
       </div>
       <div class="transparency-grid">
-        <article class="transparency-card"><b>إجمالي المساهمات المؤكدة</b><strong>قيد المراجعة</strong><span>تُحدّث بعد المطابقة المالية</span></article>
-        <article class="transparency-card"><b>إجمالي المصروفات الموثقة</b><strong>قيد المراجعة</strong><span>مرتبطة بالمستندات والفواتير</span></article>
-        <article class="transparency-card"><b>الرصيد المتاح للمشروعات</b><strong>قيد المراجعة</strong><span>بعد خصم المصروفات المعتمدة</span></article>
-        <article class="transparency-card"><b>آخر تحديث مالي</b><strong>لم يُنشر بعد</strong><span>سيظهر التاريخ عند أول اعتماد</span></article>
+        <article class="transparency-card"><b>إجمالي المساهمات المؤكدة</b><strong id="publicVerifiedTotals">جاري التحميل…</strong><span id="publicVerifiedCount">مطابقة السجلات المالية</span></article>
+        <article class="transparency-card"><b>إجمالي المصروفات الموثقة</b><strong>قيد إنشاء السجل</strong><span>لن تُعرض قيمة قبل اعتماد الفواتير</span></article>
+        <article class="transparency-card"><b>الرصيد المتاح للمشروعات</b><strong>غير محسوب بعد</strong><span>يظهر بعد تفعيل سجل المصروفات</span></article>
+        <article class="transparency-card"><b>آخر تحديث مالي</b><strong id="publicFinanceUpdated">جاري التحميل…</strong><span id="publicFinanceState">من السجلات المعتمدة</span></article>
       </div>
       <div class="transparency-note"><strong>قاعدة بُنْيَان:</strong> الهدف ليس رقمًا محققًا، والتعهد ليس مساهمة مؤكدة، والمصروف لا يُعتمد بلا مستند.</div>`;
     donate.before(section);
   };
+
+  async function loadLiveTransparency(){
+    const totalsNode=$('#publicVerifiedTotals');
+    if(!totalsNode)return;
+    try{
+      const result=await publicApi('/api/donations');
+      const rows=Array.isArray(result)?result:Array.isArray(result?.donations)?result.donations:[];
+      const verified=rows.filter(item=>item&&item.status==='verified');
+      const totals={};
+      verified.forEach(item=>{
+        const currency=String(item.currency||'SDG').toUpperCase();
+        totals[currency]=(totals[currency]||0)+Number(item.amount||0);
+      });
+      const totalEntries=Object.entries(totals).filter(([,value])=>Number.isFinite(value));
+      totalsNode.innerHTML=totalEntries.length?totalEntries.map(([currency,value])=>`<span class="public-money-line">${money(value,currency)}</span>`).join(''):'لا توجد مساهمات موثقة بعد';
+      const countText=`${verified.length.toLocaleString('en-GB')} عملية موثقة`;
+      $('#publicVerifiedCount').textContent=countText;
+      $('#verifiedDonationCount').textContent=verified.length.toLocaleString('en-GB');
+      $('#verifiedDonationHint').textContent=countText;
+      const latest=verified.map(item=>item.updated_at||item.created_at).filter(Boolean).sort((a,b)=>new Date(b)-new Date(a))[0];
+      $('#publicFinanceUpdated').textContent=dateText(latest);
+      $('#publicFinanceState').textContent=verified.length?'آخر مساهمة معتمدة':'لا توجد بيانات مالية منشورة';
+    }catch(error){
+      totalsNode.textContent='تعذر جلب البيانات الآن';
+      $('#publicVerifiedCount').textContent='سيُعاد الاتصال تلقائيًا عند تحديث الصفحة';
+      $('#publicFinanceUpdated').textContent='غير متاح الآن';
+      $('#publicFinanceState').textContent='لم تُعرض أرقام غير مؤكدة';
+      $('#verifiedDonationCount').textContent='غير متاح';
+      $('#verifiedDonationHint').textContent='تعذر الاتصال بالسجل المالي';
+      console.warn('Bunyan public transparency:',error);
+    }
+  }
 
   const ensureModal=()=>{
     let modal=$('#impactProjectModal');
@@ -133,6 +183,6 @@
     btn.setAttribute('aria-label','دخول الإدارة المصرح فقط');
   };
 
-  const init=()=>{insertNavLinks();buildImpact();buildTransparency();enhanceProjects();improveAdminEntry()};
+  const init=()=>{insertNavLinks();buildImpact();buildTransparency();enhanceProjects();improveAdminEntry();loadLiveTransparency()};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
