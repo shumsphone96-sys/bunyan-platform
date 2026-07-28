@@ -29,7 +29,7 @@
     document.head.appendChild(script);
   };
 
-  const release='20260728-complete-bilingual-interface-1';
+  const release='20260728-verified-expense-workflow-1';
   loadStyle(`./project-center.css?v=${release}`,'project-center-style');
   loadStyle(`./financial-center.css?v=${release}`,'financial-center-style');
   loadStyle(`./global-suite.css?v=${release}`,'global-suite-style');
@@ -53,4 +53,5 @@
   loadScript(`./mobile-admin-fix.js?v=${release}`,'mobile-admin-fix');
   loadScript(`./i18n-global.js?v=${release}`,'i18n-global');
   loadScript(`./impact-upgrade.js?v=${release}`,'impact-upgrade');
+  loadScript(`./finance-transparency.js?v=${release}`,'finance-transparency');
 })();
