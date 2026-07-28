@@ -29,7 +29,7 @@
     document.head.appendChild(script);
   };
 
-  const release='20260728-global-i18n-fix-2';
+  const release='20260728-global-i18n-fix-3';
   loadStyle(`./project-center.css?v=${release}`,'project-center-style');
   loadStyle(`./financial-center.css?v=${release}`,'financial-center-style');
   loadStyle(`./global-suite.css?v=${release}`,'global-suite-style');
@@ -39,7 +39,6 @@
   loadStyle(`./copy-link.css?v=${release}`,'copy-link-style');
   loadStyle(`./mobile-admin-fix.css?v=${release}`,'mobile-admin-fix-style');
   loadStyle(`./i18n-global.css?v=${release}`,'i18n-global-style');
-  loadScript(`./i18n-global.js?v=${release}`,'i18n-global');
   loadScript(`./global-upgrade.js?v=${release}`,'global-manager');
   loadScript(`./quick-project.js?v=${release}`,'quick-project');
   loadScript(`./project-center.js?v=${release}`,'project-center');
@@ -51,4 +50,5 @@
   loadScript(`./project-operations.js?v=${release}`,'project-operations');
   loadScript(`./copy-link.js?v=${release}`,'copy-link');
   loadScript(`./mobile-admin-fix.js?v=${release}`,'mobile-admin-fix');
+  loadScript(`./i18n-global.js?v=${release}`,'i18n-global');
 })();
