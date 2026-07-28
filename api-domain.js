@@ -29,7 +29,7 @@
     document.head.appendChild(script);
   };
 
-  const release='20260727-arabic-mobile-admin-1';
+  const release='20260728-global-i18n-1';
   loadStyle(`./project-center.css?v=${release}`,'project-center-style');
   loadStyle(`./financial-center.css?v=${release}`,'financial-center-style');
   loadStyle(`./global-suite.css?v=${release}`,'global-suite-style');
@@ -38,6 +38,8 @@
   loadStyle(`./project-operations.css?v=${release}`,'project-operations-style');
   loadStyle(`./copy-link.css?v=${release}`,'copy-link-style');
   loadStyle(`./mobile-admin-fix.css?v=${release}`,'mobile-admin-fix-style');
+  loadStyle(`./i18n-global.css?v=${release}`,'i18n-global-style');
+  loadScript(`./i18n-global.js?v=${release}`,'i18n-global');
   loadScript(`./global-upgrade.js?v=${release}`,'global-manager');
   loadScript(`./quick-project.js?v=${release}`,'quick-project');
   loadScript(`./project-center.js?v=${release}`,'project-center');
