@@ -40,6 +40,8 @@
 .transparency-card b{font-size:15px;color:#23332f}
 .transparency-card strong{display:block;font-size:30px;color:var(--impact-deep);margin:15px 0 8px}
 .transparency-card span{color:#6b7c77;font-size:13px}
+.transparency-card .public-money-line{display:block;color:var(--impact-deep);font-size:clamp(20px,2.3vw,28px);line-height:1.45}
+.transparency-card .public-money-line+.public-money-line{margin-top:5px;padding-top:5px;border-top:1px dashed var(--impact-line)}
 .transparency-note{margin-top:18px;padding:16px 18px;border-radius:16px;background:#fff8e8;border:1px solid #f0d9a4;color:#785b1e;line-height:1.7}
 
 .project-impact-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0}
