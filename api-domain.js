@@ -29,7 +29,7 @@
     document.head.appendChild(script);
   };
 
-  const release='20260729-language-toggle-fix-1';
+  const release='20260729-reversible-full-interface-i18n-2';
   loadStyle(`./project-center.css?v=${release}`,'project-center-style');
   loadStyle(`./financial-center.css?v=${release}`,'financial-center-style');
   loadStyle(`./global-suite.css?v=${release}`,'global-suite-style');
@@ -37,7 +37,7 @@
   loadStyle(`./completion-suite.css?v=${release}`,'completion-suite-style');
   loadStyle(`./project-operations.css?v=${release}`,'project-operations-style');
   loadStyle(`./copy-link.css?v=${release}`,'copy-link-style');
-  loadStyle(`./mobile-admin-fix.css?v=${release}`,'mobile-admin-fix-style');
+  loadStyle(`./mobile-admin-fix.css?v=${release}`,'mobile-admin-fix');
   loadStyle(`./i18n-global.css?v=${release}`,'i18n-global-style');
   loadStyle(`./impact-upgrade.css?v=${release}`,'impact-upgrade-style');
   loadStyle(`./public-project-page.css?v=${release}`,'public-project-page-style');
