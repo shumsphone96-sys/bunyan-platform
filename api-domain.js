@@ -29,7 +29,7 @@
     document.head.appendChild(script);
   };
 
-  const release='20260728-live-public-transparency-2';
+  const release='20260728-complete-bilingual-interface-1';
   loadStyle(`./project-center.css?v=${release}`,'project-center-style');
   loadStyle(`./financial-center.css?v=${release}`,'financial-center-style');
   loadStyle(`./global-suite.css?v=${release}`,'global-suite-style');
