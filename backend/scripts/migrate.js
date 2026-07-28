@@ -14,7 +14,9 @@ try {
   await pool.query(v8);
   const v9 = await fs.readFile(new URL('../database/v9.sql', import.meta.url), 'utf8');
   await pool.query(v9);
-  console.log('BUNYAN database schema v9 is ready.');
+  const v10 = await fs.readFile(new URL('../database/v10.sql', import.meta.url), 'utf8');
+  await pool.query(v10);
+  console.log('BUNYAN database schema v10 is ready.');
 
   const resetEmail=process.env.ADMIN_EMAIL?.trim().toLowerCase();
   const resetPassword=process.env.ADMIN_RESET_PASSWORD;
