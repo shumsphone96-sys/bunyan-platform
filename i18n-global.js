@@ -1,23 +1,136 @@
 (()=>{
   const KEY='bunyan_language';
-  let lang=localStorage.getItem(KEY)==='en'?'en':'ar';
+  const AR='ar', EN='en';
+  let lang=localStorage.getItem(KEY)===EN?EN:AR;
+
   const pairs=[
-    ['Overview','نظرة عامة'],['Projects','المشروعات'],['Beneficiaries','المستفيدون'],['Volunteers','المتطوعون'],['Settings','الإعدادات'],['View Website','عرض الموقع'],['Finance Centre','المركز المالي'],['Transparency & Reports','الشفافية والتقارير'],['Project Transparency','شفافية المشروعات'],['Project Management','إدارة المشروعات'],['New Project','مشروع جديد'],['Add Project','إضافة مشروع'],['Dashboard','لوحة التحكم'],['Reports','التقارير'],['Donations','المساهمات'],['Expenses','المصروفات'],['Documents','المستندات'],['Logout','تسجيل الخروج'],['Platform Settings','إعدادات بُنْيَان'],['Appearance, language and device settings.','المظهر واللغة وإعدادات الجهاز.'],['Dark Mode','الوضع الليلي'],['Improve readability in low light.','تحسين القراءة في الإضاءة المنخفضة.'],['Enable Dark Mode','تشغيل الوضع الليلي'],['Disable Dark Mode','إيقاف الوضع الليلي'],['Language','اللغة'],['Arabic is the primary interface, with instant translation across the system.','الواجهة العربية هي الأساسية، مع ترجمة فورية لجميع عناصر النظام.'],['Arabic is the primary interface, with instant translation for main headings.','الواجهة العربية هي الأساسية، مع طبقة ترجمة فورية للعناوين الرئيسية.'],['Switch to English','التبديل إلى الإنجليزية'],['Switch to Arabic','التبديل إلى العربية'],['App Update','تحديث التطبيق'],['Clear the local cache and reload the latest version.','حذف الكاش المحلي وإعادة تحميل أحدث إصدار.'],['Clear the local cache and reload the latest version','حذف الكاش المحلي وإعادة تحميل أحدث إصدار'],['Full Update','تحديث كامل'],['Check for Update','التحقق من التحديث'],['Search','بحث'],['Save','حفظ'],['Cancel','إلغاء'],['Delete','حذف'],['Edit','تعديل'],['Preview','معاينة'],['Share Project','مشاركة المشروع'],['Copy Link','نسخ الرابط'],['Copied!','تم النسخ!'],['Loading...','جاري التحميل...'],['No data available','لا توجد بيانات'],['Create Project','إنشاء مشروع'],['Project Name','اسم المشروع'],['Executive Summary','الملخص التنفيذي'],['Status','الحالة'],['Progress','نسبة الإنجاز'],['Budget','الميزانية'],['Currency','العملة'],['Target Beneficiaries','عدد المستفيدين المستهدف'],['Publish project on public website','نشر المشروع في الموقع العام'],['Active','نشط'],['Completed','مكتمل'],['Paused','متوقف مؤقتًا'],['Planning','قيد التخطيط'],['Draft','مسودة'],['Public','منشور'],['Private','غير منشور'],['Project expenses and documents','مصروفات المشروع ومستنداته'],['Add expense','إضافة مصروف'],['Upload document','رفع مستند'],['Amount','المبلغ'],['Date','التاريخ'],['Category','التصنيف'],['Notes','ملاحظات'],['File','الملف'],['Download','تنزيل'],['Receipt','فاتورة أو إيصال']
+    ['Overview','نظرة عامة'],['Projects','المشروعات'],['Beneficiaries','المستفيدون'],['Volunteers','المتطوعون'],
+    ['Settings','الإعدادات'],['View Website','عرض الموقع'],['Finance Centre','المركز المالي'],
+    ['Transparency & Reports','الشفافية والتقارير'],['Project Transparency','شفافية المشروعات'],
+    ['Project Management','إدارة المشروعات'],['New Project','مشروع جديد'],['Add Project','إضافة مشروع'],
+    ['Dashboard','لوحة التحكم'],['Reports','التقارير'],['Donations','المساهمات'],['Expenses','المصروفات'],
+    ['Documents','المستندات'],['Logout','تسجيل الخروج'],['Platform Settings','إعدادات بُنْيَان'],
+    ['Appearance, language and device settings.','المظهر واللغة وإعدادات الجهاز.'],['Dark Mode','الوضع الليلي'],
+    ['Improve readability in low light.','تحسين القراءة في الإضاءة المنخفضة.'],['Enable Dark Mode','تشغيل الوضع الليلي'],
+    ['Disable Dark Mode','إيقاف الوضع الليلي'],['Language','اللغة'],
+    ['Arabic is the primary interface, with instant translation for main headings.','الواجهة العربية هي الأساسية، مع طبقة ترجمة فورية للعناوين الرئيسية.'],
+    ['Arabic is the primary interface, with instant translation across the system.','الواجهة العربية هي الأساسية، مع ترجمة فورية لجميع عناصر النظام.'],
+    ['App Update','تحديث التطبيق'],['Clear local cache and reload the latest release.','حذف الكاش المحلي وإعادة تحميل أحدث إصدار.'],
+    ['Full Update','تحديث كامل'],['Check for Update','التحقق من التحديث'],['Search','بحث'],['Save','حفظ'],
+    ['Cancel','إلغاء'],['Delete','حذف'],['Edit','تعديل'],['Preview','معاينة'],['Share Project','مشاركة المشروع'],
+    ['Copy Link','نسخ الرابط'],['Copied!','تم النسخ!'],['Loading...','جاري التحميل...'],['No data available','لا توجد بيانات'],
+    ['Create Project','إنشاء مشروع'],['Project Name','اسم المشروع'],['Executive Summary','الملخص التنفيذي'],
+    ['Status','الحالة'],['Progress','نسبة الإنجاز'],['Budget','الميزانية'],['Currency','العملة'],
+    ['Target Beneficiaries','عدد المستفيدين المستهدف'],['Publish project on public website','نشر المشروع في الموقع العام'],
+    ['Active','نشط'],['Completed','مكتمل'],['Paused','متوقف مؤقتًا'],['Planning','قيد التخطيط'],['Draft','مسودة'],
+    ['Public','منشور'],['Private','غير منشور'],['Project expenses and documents','مصروفات المشروع ومستنداته'],
+    ['Add expense','إضافة مصروف'],['Upload document','رفع مستند'],['Amount','المبلغ'],['Date','التاريخ'],
+    ['Category','التصنيف'],['Notes','ملاحظات'],['File','الملف'],['Download','تنزيل'],['Receipt','فاتورة أو إيصال']
   ];
+
   const arToEn=new Map(pairs.map(([en,ar])=>[ar,en]));
   const enToAr=new Map(pairs.map(([en,ar])=>[en,ar]));
-  const norm=v=>String(v??'').replace(/\s+/g,' ').trim();
-  const map=()=>lang==='en'?arToEn:enToAr;
-  const isToggle=t=>/English|العربية|التبديل|Switch\s+to/i.test(t);
-  function translated(value){const clean=norm(value);if(!clean)return value;const next=map().get(clean);if(!next)return value;const s=String(value);return (s.match(/^\s*/)?.[0]||'')+next+(s.match(/\s*$/)?.[0]||'')}
-  function translateNode(node){if(!node)return;if(node.nodeType===3){const p=node.parentElement;if(!p||p.closest('[data-no-i18n]')||['SCRIPT','STYLE','TEXTAREA'].includes(p.tagName))return;const next=translated(node.nodeValue);if(next!==node.nodeValue)node.nodeValue=next;return}if(node.nodeType!==1||node.closest('[data-no-i18n]'))return;['placeholder','title','aria-label','value'].forEach(a=>{if(node.hasAttribute(a)&&!(a==='value'&&!['BUTTON','INPUT'].includes(node.tagName))){const old=node.getAttribute(a),next=translated(old);if(next!==old)node.setAttribute(a,next)}})}
-  function markToggle(){document.querySelectorAll('button,a').forEach(el=>{const t=norm(el.textContent);if(isToggle(t)&&(/English|العربية|التبديل|Switch to/i.test(t)||el.closest('.language-card,.settings-card,[data-setting="language"]'))){el.dataset.languageToggle='true';el.textContent=lang==='ar'?'Switch to English':'التبديل إلى العربية';el.setAttribute('aria-label',el.textContent)}})}
-  function dedupe(){document.querySelectorAll('section,article,div').forEach(box=>{const hs=[...box.querySelectorAll(':scope > h1,:scope > h2,:scope > h3,:scope > small,:scope > span')];const seen=new Set();hs.forEach(h=>{const t=norm(h.textContent).toLowerCase();if(!t)return;if(seen.has(t)&&/platform settings|إعدادات بُنْيَان/.test(t))h.style.display='none';else seen.add(t)})})}
-  function apply(root=document.body){if(!root)return;translateNode(root);const w=document.createTreeWalker(root,NodeFilter.SHOW_ELEMENT|NodeFilter.SHOW_TEXT);let n;while((n=w.nextNode()))translateNode(n);markToggle();dedupe()}
-  function setLanguage(next){lang=next==='en'?'en':'ar';localStorage.setItem(KEY,lang);document.documentElement.lang=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';document.body?.classList.toggle('lang-en',lang==='en');document.body?.classList.toggle('lang-ar',lang==='ar');apply(document.body);window.dispatchEvent(new CustomEvent('bunyan:languagechange',{detail:{lang}}))}
-  document.addEventListener('click',e=>{const el=e.target.closest('button,a');if(!el)return;const text=norm(el.textContent);if(el.dataset.languageToggle==='true'||isToggle(text)&&!!el.closest('.language-card,.settings-card,[data-setting="language"]')){e.preventDefault();e.stopImmediatePropagation();setLanguage(lang==='ar'?'en':'ar')}},true);
-  const observer=new MutationObserver(()=>requestAnimationFrame(()=>apply(document.body)));
-  function init(){setLanguage(lang);observer.observe(document.documentElement,{childList:true,subtree:true});setInterval(()=>apply(document.body),1000)}
+  const normalize=v=>String(v??'').replace(/\s+/g,' ').trim();
+  const isToggleText=t=>/English|العربية|التبديل|Switch\s+to/i.test(t);
+
+  function translated(value){
+    const clean=normalize(value);
+    if(!clean)return value;
+    const map=lang===EN?arToEn:enToAr;
+    const next=map.get(clean);
+    if(!next)return value;
+    const source=String(value);
+    return (source.match(/^\s*/)?.[0]||'')+next+(source.match(/\s*$/)?.[0]||'');
+  }
+
+  function translateNode(node){
+    if(!node)return;
+    if(node.nodeType===Node.TEXT_NODE){
+      const p=node.parentElement;
+      if(!p||p.closest('[data-no-i18n]')||['SCRIPT','STYLE','TEXTAREA'].includes(p.tagName))return;
+      const next=translated(node.nodeValue);
+      if(next!==node.nodeValue)node.nodeValue=next;
+      return;
+    }
+    if(node.nodeType!==Node.ELEMENT_NODE||node.closest('[data-no-i18n]'))return;
+    ['placeholder','title','aria-label','value'].forEach(attr=>{
+      if(node.hasAttribute(attr)&&!(attr==='value'&&!['BUTTON','INPUT'].includes(node.tagName))){
+        const old=node.getAttribute(attr),next=translated(old);
+        if(next!==old)node.setAttribute(attr,next);
+      }
+    });
+  }
+
+  function refreshToggle(){
+    document.querySelectorAll('button,a').forEach(el=>{
+      const t=normalize(el.textContent);
+      const inSettings=!!el.closest('.language-card,.settings-card,[data-setting="language"]');
+      if((inSettings&&isToggleText(t))||/Switch to English|Switch to Arabic|التبديل إلى الإنجليزية|التبديل إلى العربية/i.test(t)){
+        el.dataset.languageToggle='true';
+        el.textContent=lang===AR?'Switch to English':'التبديل إلى العربية';
+        el.setAttribute('aria-label',el.textContent);
+      }
+    });
+  }
+
+  function removeDuplicateHeroTitle(){
+    document.querySelectorAll('section,article,div').forEach(box=>{
+      const direct=[...box.children].filter(el=>/^H[1-6]$/.test(el.tagName));
+      if(direct.length<2)return;
+      const seen=new Set();
+      direct.forEach(h=>{
+        const key=normalize(h.textContent).toLowerCase();
+        if(!key)return;
+        if(seen.has(key))h.style.display='none';
+        else {seen.add(key);h.style.display='';}
+      });
+    });
+  }
+
+  function apply(root=document.body){
+    if(!root)return;
+    translateNode(root);
+    const walker=document.createTreeWalker(root,NodeFilter.SHOW_ELEMENT|NodeFilter.SHOW_TEXT);
+    let n;while((n=walker.nextNode()))translateNode(n);
+    refreshToggle();
+    removeDuplicateHeroTitle();
+  }
+
+  function setLanguage(next){
+    lang=next===EN?EN:AR;
+    localStorage.setItem(KEY,lang);
+    document.documentElement.lang=lang;
+    document.documentElement.dir=lang===AR?'rtl':'ltr';
+    document.body?.classList.toggle('lang-en',lang===EN);
+    document.body?.classList.toggle('lang-ar',lang===AR);
+    apply(document.body);
+    window.dispatchEvent(new CustomEvent('bunyan:languagechange',{detail:{lang}}));
+  }
+
+  document.addEventListener('click',e=>{
+    const el=e.target.closest('button,a');
+    if(!el)return;
+    const text=normalize(el.textContent);
+    if(el.dataset.languageToggle==='true'||(isToggleText(text)&&!!el.closest('.language-card,.settings-card,[data-setting="language"]'))){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      setLanguage(lang===AR?EN:AR);
+    }
+  },true);
+
+  let queued=false;
+  const observer=new MutationObserver(()=>{
+    if(queued)return;
+    queued=true;
+    requestAnimationFrame(()=>{queued=false;apply(document.body);});
+  });
+
+  function init(){
+    setLanguage(lang);
+    observer.observe(document.documentElement,{childList:true,subtree:true,characterData:true});
+    setInterval(()=>apply(document.body),1200);
+  }
+
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
-  window.BunyanI18n={get language(){return lang},setLanguage,t:key=>map().get(key)||key};
+  window.BunyanI18n={get language(){return lang},setLanguage,t:key=>(lang===EN?arToEn:enToAr).get(key)||key};
 })();
