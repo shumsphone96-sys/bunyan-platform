@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#071a17">
+  <title>دخول إدارة بُنْيَان</title>
+  <style>
+    :root{--g:#071a17;--g2:#0d3028;--gold:#d7aa4b;--paper:#f5f2e9;--ink:#12231f;--muted:#687571;--line:#dfe5e1}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;font-family:Tahoma,Arial,sans-serif;background:radial-gradient(circle at 75% 25%,#1c5848,var(--g2) 34%,var(--g) 75%);color:var(--ink)}.card{width:min(430px,100%);background:#fff;border-radius:24px;padding:30px;box-shadow:0 25px 80px #0005}.brand{display:flex;align-items:center;gap:12px;margin-bottom:25px}.logo{width:54px;height:54px;border:1px solid var(--gold);border-radius:50%;display:grid;place-items:center;color:var(--gold);font-size:30px;font-weight:bold}.brand strong{display:block;font-size:24px}.brand small{color:var(--muted)}h1{font-size:25px;margin:0 0 8px}p{color:var(--muted);line-height:1.8;margin:0 0 22px}form{display:grid;gap:13px}label{font-weight:700;font-size:14px}input{width:100%;padding:14px;border:1px solid var(--line);border-radius:12px;font:inherit;outline:none}input:focus{border-color:var(--gold);box-shadow:0 0 0 3px #d7aa4b22}button,.back{border:0;border-radius:999px;padding:14px 20px;font:inherit;font-weight:bold;text-align:center;text-decoration:none;cursor:pointer}.submit{background:linear-gradient(135deg,var(--gold),#f0d084);color:#211604}.back{border:1px solid var(--line);color:var(--ink);background:#fff}.msg{min-height:22px;color:#a72f2f;font-size:14px}.lang{display:flex;justify-content:center;gap:10px;margin-top:18px}.lang a{color:var(--muted);text-decoration:none}.lang a.active{color:#987125;font-weight:bold}@media(max-width:480px){.card{padding:24px 19px;border-radius:20px}}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="brand"><div class="logo">ب</div><div><strong id="brandName">بُنْيَان</strong><small id="brandSub">مؤسسة شمس الأنبياء للتنمية</small></div></div>
+    <h1 id="title">دخول لوحة الإدارة</h1>
+    <p id="intro">أدخل البريد الإلكتروني وكلمة المرور الخاصة بحساب الإدارة.</p>
+    <form id="adminLoginForm">
+      <label for="email" id="emailLabel">البريد الإلكتروني</label>
+      <input id="email" name="email" type="email" autocomplete="username" required>
+      <label for="password" id="passwordLabel">كلمة المرور</label>
+      <input id="password" name="password" type="password" minlength="10" autocomplete="current-password" required>
+      <button class="submit" id="submitBtn" type="submit">دخول</button>
+      <div class="msg" id="msg" aria-live="polite"></div>
+      <a class="back" id="backLink" href="./">العودة إلى الموقع</a>
+    </form>
+    <div class="lang"><a href="./admin.html?lang=ar" id="arLink">العربية</a><a href="./admin.html?lang=en" id="enLink">English</a></div>
+  </main>
+<script>
+(()=>{
+  const lang=new URLSearchParams(location.search).get('lang')==='en'?'en':'ar';
+  const copy={ar:{brand:'بُنْيَان',sub:'مؤسسة شمس الأنبياء للتنمية',title:'دخول لوحة الإدارة',intro:'أدخل البريد الإلكتروني وكلمة المرور الخاصة بحساب الإدارة.',email:'البريد الإلكتروني',password:'كلمة المرور',submit:'دخول',loading:'جاري التحقق...',back:'العودة إلى الموقع',fail:'تعذر تسجيل الدخول.'},en:{brand:'BUNYAN',sub:'Shams Al-Anbiya Foundation for Development',title:'Admin Dashboard Sign In',intro:'Enter the email address and password for your administrator account.',email:'Email Address',password:'Password',submit:'Sign In',loading:'Signing in...',back:'Back to Website',fail:'Unable to sign in.'}}[lang];
+  document.documentElement.lang=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';
+  brandName.textContent=copy.brand;brandSub.textContent=copy.sub;title.textContent=copy.title;intro.textContent=copy.intro;emailLabel.textContent=copy.email;passwordLabel.textContent=copy.password;submitBtn.textContent=copy.submit;backLink.textContent=copy.back;
+  arLink.classList.toggle('active',lang==='ar');enLink.classList.toggle('active',lang==='en');
+  const origins=['https://api.bunyan-sudan.org','https://bunyan-api-qhkf.onrender.com'];
+  adminLoginForm.addEventListener('submit',async e=>{e.preventDefault();submitBtn.disabled=true;msg.textContent=copy.loading;let last;for(const origin of origins){try{const r=await fetch(origin+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email.value.trim(),password:password.value}),cache:'no-store'});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.error||data.message||copy.fail);sessionStorage.setItem('bunyan_token',data.token);sessionStorage.setItem('bunyan_api_origin',origin);location.replace('./?lang='+lang+'&admin=1');return;}catch(err){last=err;}}msg.textContent=last?.message||copy.fail;submitBtn.disabled=false;});
+})();
+</script>
+</body>
+</html>
