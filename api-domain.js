@@ -1,62 +1,111 @@
 (()=>{
+  'use strict';
+
   const official='https://api.bunyan-sudan.org';
   const render='https://bunyan-api-qhkf.onrender.com';
+  const release='20260729-final-stable-release-1';
+
   window.BUNYAN_API_ORIGINS=[official,render];
   window.BUNYAN_API_ORIGIN=official;
+  window.BUNYAN_RELEASE=release;
+
+  document.documentElement.classList.add('bunyan-loading');
+  const reveal=()=>{
+    document.documentElement.classList.remove('bunyan-loading');
+    document.documentElement.classList.add('bunyan-ready');
+    if(document.body){
+      document.body.style.visibility='visible';
+      document.body.style.opacity='1';
+    }
+  };
+
+  // Never allow an optional module to leave the public page blank.
+  window.addEventListener('error',event=>{
+    console.error('BUNYAN frontend error:',event.error||event.message);
+    reveal();
+  });
+  window.addEventListener('unhandledrejection',event=>{
+    console.error('BUNYAN rejected promise:',event.reason);
+    reveal();
+  });
+  setTimeout(reveal,2500);
 
   if('serviceWorker' in navigator){
     navigator.serviceWorker.getRegistrations()
       .then(registrations=>Promise.all(registrations.map(r=>r.unregister())))
       .catch(()=>{});
+    if('caches' in window){
+      caches.keys().then(keys=>Promise.all(keys.map(key=>caches.delete(key)))).catch(()=>{});
+    }
   }
 
-  const loadStyle=(href,key)=>{
+  const loadStyle=(file,key)=>{
     if(document.querySelector(`link[data-bunyan-module="${key}"]`))return;
     const link=document.createElement('link');
     link.rel='stylesheet';
-    link.href=href;
+    link.href=`./${file}?v=${release}`;
     link.dataset.bunyanModule=key;
+    link.onerror=()=>console.warn(`Optional stylesheet failed: ${file}`);
     document.head.appendChild(link);
   };
 
-  const loadScript=(src,key)=>{
-    if(document.querySelector(`script[data-bunyan-module="${key}"]`))return;
+  const loadScript=(file,key)=>new Promise(resolve=>{
+    if(document.querySelector(`script[data-bunyan-module="${key}"]`)){resolve();return;}
     const script=document.createElement('script');
-    script.src=src;
-    script.defer=true;
+    script.src=`./${file}?v=${release}`;
+    script.async=false;
     script.dataset.bunyanModule=key;
-    script.onerror=()=>console.error(`تعذر تحميل ${src}`);
+    script.onload=resolve;
+    script.onerror=()=>{
+      console.warn(`Optional script failed: ${file}`);
+      resolve();
+    };
     document.head.appendChild(script);
-  };
+  });
 
-  const release='20260729-ios-blank-page-hotfix-1';
-  loadStyle(`./project-center.css?v=${release}`,'project-center-style');
-  loadStyle(`./financial-center.css?v=${release}`,'financial-center-style');
-  loadStyle(`./global-suite.css?v=${release}`,'global-suite-style');
-  loadStyle(`./project-transparency.css?v=${release}`,'project-transparency-style');
-  loadStyle(`./completion-suite.css?v=${release}`,'completion-suite-style');
-  loadStyle(`./project-operations.css?v=${release}`,'project-operations-style');
-  loadStyle(`./copy-link.css?v=${release}`,'copy-link-style');
-  loadStyle(`./mobile-admin-fix.css?v=${release}`,'mobile-admin-fix-style');
-  loadStyle(`./i18n-global.css?v=${release}`,'i18n-global-style');
-  loadStyle(`./impact-upgrade.css?v=${release}`,'impact-upgrade-style');
-  loadStyle(`./public-project-page.css?v=${release}`,'public-project-page-style');
-  loadStyle(`./project-map.css?v=${release}`,'project-map-style');
-  loadScript(`./global-upgrade.js?v=${release}`,'global-manager');
-  loadScript(`./quick-project.js?v=${release}`,'quick-project');
-  loadScript(`./project-center.js?v=${release}`,'project-center');
-  loadScript(`./financial-center.js?v=${release}`,'financial-center');
-  loadScript(`./global-admin.js?v=${release}`,'global-admin');
-  loadScript(`./global-suite.js?v=${release}`,'global-suite');
-  loadScript(`./project-transparency.js?v=${release}`,'project-transparency');
-  loadScript(`./completion-suite.js?v=${release}`,'completion-suite');
-  loadScript(`./project-operations.js?v=${release}`,'project-operations');
-  loadScript(`./copy-link.js?v=${release}`,'copy-link');
-  loadScript(`./mobile-admin-fix.js?v=${release}`,'mobile-admin-fix');
-  loadScript(`./i18n-global.js?v=${release}`,'i18n-global');
-  loadScript(`./impact-upgrade.js?v=${release}`,'impact-upgrade');
-  loadScript(`./finance-transparency.js?v=${release}`,'finance-transparency');
-  loadScript(`./public-project-page.js?v=${release}`,'public-project-page');
-  loadScript(`./project-map.js?v=${release}`,'project-map');
-  loadScript(`./project-geo-admin.js?v=${release}`,'project-geo-admin');
+  [
+    ['project-center.css','project-center-style'],
+    ['financial-center.css','financial-center-style'],
+    ['global-suite.css','global-suite-style'],
+    ['project-transparency.css','project-transparency-style'],
+    ['completion-suite.css','completion-suite-style'],
+    ['project-operations.css','project-operations-style'],
+    ['copy-link.css','copy-link-style'],
+    ['mobile-admin-fix.css','mobile-admin-fix-style'],
+    ['i18n-global.css','i18n-global-style'],
+    ['impact-upgrade.css','impact-upgrade-style'],
+    ['public-project-page.css','public-project-page-style'],
+    ['project-map.css','project-map-style']
+  ].forEach(([file,key])=>loadStyle(file,key));
+
+  const modules=[
+    // Translation must exist before dynamic cards and dialogs are created.
+    ['i18n-global.js','i18n-global'],
+    ['global-upgrade.js','global-manager'],
+    ['quick-project.js','quick-project'],
+    ['project-center.js','project-center'],
+    ['financial-center.js','financial-center'],
+    ['global-admin.js','global-admin'],
+    ['global-suite.js','global-suite'],
+    ['project-transparency.js','project-transparency'],
+    ['completion-suite.js','completion-suite'],
+    ['project-operations.js','project-operations'],
+    ['copy-link.js','copy-link'],
+    ['mobile-admin-fix.js','mobile-admin-fix'],
+    ['impact-upgrade.js','impact-upgrade'],
+    ['finance-transparency.js','finance-transparency'],
+    ['public-project-page.js','public-project-page'],
+    ['project-map.js','project-map'],
+    ['project-geo-admin.js','project-geo-admin']
+  ];
+
+  (async()=>{
+    for(const [file,key] of modules)await loadScript(file,key);
+    window.BunyanI18n?.refresh?.();
+    reveal();
+    window.dispatchEvent(new CustomEvent('bunyan:ready',{detail:{release}}));
+  })().catch(error=>{
+    console.error('BUNYAN bootstrap failed:',error);
+    reveal();
+  });
 })();
