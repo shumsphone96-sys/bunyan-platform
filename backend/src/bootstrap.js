@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 const sourceUrl=new URL('./server-v8.js',import.meta.url);
 let source=await fs.readFile(sourceUrl,'utf8');
 
-source=source.replaceAll("version:'8.0.0'","version:'10.1.1'").replaceAll('BUNYAN Cloud API 8.0.0','BUNYAN Cloud API 10.1.1');
+source=source.replaceAll("version:'8.0.0'","version:'10.2.0'").replaceAll('BUNYAN Cloud API 8.0.0','BUNYAN Cloud API 10.2.0');
 source=source.replace(
   "app.use('/api/',rateLimit({windowMs:15*60*1000,limit:400,standardHeaders:'draft-7',legacyHeaders:false,message:{error:'طلبات كثيرة. حاول لاحقاً.'}}));",
   "app.use('/api/',rateLimit({windowMs:15*60*1000,limit:1200,skip:req=>req.method==='GET'||req.method==='HEAD'||req.method==='OPTIONS',standardHeaders:'draft-7',legacyHeaders:false,message:{error:'طلبات كثيرة. حاول بعد دقائق.'}}));"
@@ -32,6 +32,29 @@ source=source.replace(
   "if(req.params.resource==='donations'&&req.body.status==='verified')await pool.query('UPDATE donations SET verified_at=now(),verified_by=$1 WHERE id=$2',[req.user.sub,req.params.id]);",
   "if(req.params.resource==='donations'&&req.body.status==='verified')await pool.query('UPDATE donations SET verified_at=now(),verified_by=$1 WHERE id=$2',[req.user.sub,req.params.id]);if(req.params.resource==='expenses'){if(req.body.status==='verified')await pool.query('UPDATE project_expenses SET verified_at=now(),verified_by=$1 WHERE id=$2',[req.user.sub,req.params.id]);if(req.body.status&&req.body.status!=='verified')await pool.query('UPDATE project_expenses SET verified_at=null,verified_by=null WHERE id=$1',[req.params.id]);}"
 );
+
+const adminBootstrap=`
+async function ensureEnvironmentAdmin(){
+  const email=String(process.env.ADMIN_EMAIL||'').trim().toLowerCase();
+  const password=String(process.env.ADMIN_PASSWORD||'');
+  const name=String(process.env.ADMIN_NAME||'مدير بُنْيَان').trim();
+  if(!email&&!password){console.log('Admin bootstrap skipped: ADMIN_EMAIL and ADMIN_PASSWORD are not configured');return;}
+  if(!email||!password)throw new Error('ADMIN_EMAIL and ADMIN_PASSWORD must both be configured');
+  if(password.length<10)throw new Error('ADMIN_PASSWORD must contain at least 10 characters');
+  const passwordHash=await bcrypt.hash(password,12);
+  const existing=await pool.query('SELECT id FROM users WHERE lower(email)=lower($1) LIMIT 1',[email]);
+  if(existing.rows[0]){
+    await pool.query("UPDATE users SET name=$1,email=$2,password_hash=$3,role='admin',is_active=true,updated_at=now() WHERE id=$4",[name,email,passwordHash,existing.rows[0].id]);
+    console.log('Environment admin account synchronized');
+    return;
+  }
+  await pool.query("INSERT INTO users(name,email,password_hash,role,is_active) VALUES($1,$2,$3,'admin',true)",[name,email,passwordHash]);
+  console.log('Environment admin account created');
+}
+
+await ensureEnvironmentAdmin();
+`;
+source=source.replace("app.listen(port,()=>console.log(`BUNYAN Cloud API 8.0.0 listening on ${port}`));",adminBootstrap+"\napp.listen(port,()=>console.log(`BUNYAN Cloud API 10.2.0 listening on ${port}`));");
 
 const runtimeUrl=new URL('./.server-v10-runtime.mjs',import.meta.url);
 await fs.writeFile(runtimeUrl,source,'utf8');
