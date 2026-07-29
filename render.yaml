@@ -27,7 +27,7 @@ services:
         value: شمس الأنبياء أحمد
       - key: ADMIN_EMAIL
         value: shumsphone96@gmail.com
-      - key: ADMIN_PASSWORD
+      - key: ADMIN_RESET_PASSWORD
         sync: false
       - key: NOTIFICATION_EMAIL
         value: shumsphone96@gmail.com
