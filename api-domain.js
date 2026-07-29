@@ -3,7 +3,7 @@
 
   const official='https://api.bunyan-sudan.org';
   const render='https://bunyan-api-qhkf.onrender.com';
-  const release='20260729-language-authority-final-1';
+  const release='20260729-single-language-engine-1';
 
   window.BUNYAN_API_ORIGINS=[official,render];
   window.BUNYAN_API_ORIGIN=official;
@@ -13,10 +13,7 @@
   const reveal=()=>{
     document.documentElement.classList.remove('bunyan-loading');
     document.documentElement.classList.add('bunyan-ready');
-    if(document.body){
-      document.body.style.visibility='visible';
-      document.body.style.opacity='1';
-    }
+    if(document.body){document.body.style.visibility='visible';document.body.style.opacity='1';}
   };
 
   window.addEventListener('error',event=>{console.error('BUNYAN frontend error:',event.error||event.message);reveal();});
@@ -49,12 +46,9 @@
   ].forEach(([file,key])=>loadStyle(file,key));
 
   const modules=[
-    ['language-url-bridge.js','language-url-bridge'],
     ['i18n-global.js','i18n-global'],
-    ['language-selector.js','language-selector'],
     ['mobile-public-menu.js','mobile-public-menu'],
-    ['global-upgrade.js','global-manager'],['quick-project.js','quick-project'],['project-center.js','project-center'],['financial-center.js','financial-center'],['global-admin.js','global-admin'],['global-suite.js','global-suite'],['project-transparency.js','project-transparency'],['completion-suite.js','completion-suite'],['project-operations.js','project-operations'],['copy-link.js','copy-link'],['mobile-admin-fix.js','mobile-admin-fix'],['impact-upgrade.js','impact-upgrade'],['finance-transparency.js','finance-transparency'],['public-project-page.js','public-project-page'],['project-map.js','project-map'],['project-geo-admin.js','project-geo-admin'],
-    ['language-authority.js','language-authority']
+    ['global-upgrade.js','global-manager'],['quick-project.js','quick-project'],['project-center.js','project-center'],['financial-center.js','financial-center'],['global-admin.js','global-admin'],['global-suite.js','global-suite'],['project-transparency.js','project-transparency'],['completion-suite.js','completion-suite'],['project-operations.js','project-operations'],['copy-link.js','copy-link'],['mobile-admin-fix.js','mobile-admin-fix'],['impact-upgrade.js','impact-upgrade'],['finance-transparency.js','finance-transparency'],['public-project-page.js','public-project-page'],['project-map.js','project-map'],['project-geo-admin.js','project-geo-admin']
   ];
 
   (async()=>{
