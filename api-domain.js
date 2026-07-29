@@ -3,7 +3,7 @@
 
   const official='https://api.bunyan-sudan.org';
   const render='https://bunyan-api-qhkf.onrender.com';
-  const release='20260729-final-stable-release-1';
+  const release='20260729-mobile-menu-language-fix-1';
 
   window.BUNYAN_API_ORIGINS=[official,render];
   window.BUNYAN_API_ORIGIN=official;
@@ -19,7 +19,6 @@
     }
   };
 
-  // Never allow an optional module to leave the public page blank.
   window.addEventListener('error',event=>{
     console.error('BUNYAN frontend error:',event.error||event.message);
     reveal();
@@ -75,12 +74,13 @@
     ['i18n-global.css','i18n-global-style'],
     ['impact-upgrade.css','impact-upgrade-style'],
     ['public-project-page.css','public-project-page-style'],
-    ['project-map.css','project-map-style']
+    ['project-map.css','project-map-style'],
+    ['mobile-public-menu.css','mobile-public-menu-style']
   ].forEach(([file,key])=>loadStyle(file,key));
 
   const modules=[
-    // Translation must exist before dynamic cards and dialogs are created.
     ['i18n-global.js','i18n-global'],
+    ['mobile-public-menu.js','mobile-public-menu'],
     ['global-upgrade.js','global-manager'],
     ['quick-project.js','quick-project'],
     ['project-center.js','project-center'],
