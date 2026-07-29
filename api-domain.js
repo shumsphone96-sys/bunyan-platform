@@ -3,7 +3,7 @@
 
   const official='https://api.bunyan-sudan.org';
   const render='https://bunyan-api-qhkf.onrender.com';
-  const release='20260729-native-language-links-1';
+  const release='20260729-native-language-router-2';
 
   window.BUNYAN_API_ORIGINS=[official,render];
   window.BUNYAN_API_ORIGIN=official;
@@ -46,6 +46,7 @@
   ].forEach(([file,key])=>loadStyle(file,key));
 
   const modules=[
+    ['language-native-router.js','language-native-router'],
     ['i18n-bindings.js','i18n-bindings'],
     ['i18n-keyed.js','i18n-keyed'],
     ['public-locale-render.js','public-locale-render'],
