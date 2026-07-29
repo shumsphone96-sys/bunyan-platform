@@ -3,7 +3,7 @@
 
   const official='https://api.bunyan-sudan.org';
   const render='https://bunyan-api-qhkf.onrender.com';
-  const release='20260729-full-interface-language-final-1';
+  const release='20260729-explicit-language-selector-1';
 
   window.BUNYAN_API_ORIGINS=[official,render];
   window.BUNYAN_API_ORIGIN=official;
@@ -19,31 +19,19 @@
     }
   };
 
-  window.addEventListener('error',event=>{
-    console.error('BUNYAN frontend error:',event.error||event.message);
-    reveal();
-  });
-  window.addEventListener('unhandledrejection',event=>{
-    console.error('BUNYAN rejected promise:',event.reason);
-    reveal();
-  });
+  window.addEventListener('error',event=>{console.error('BUNYAN frontend error:',event.error||event.message);reveal();});
+  window.addEventListener('unhandledrejection',event=>{console.error('BUNYAN rejected promise:',event.reason);reveal();});
   setTimeout(reveal,2500);
 
   if('serviceWorker' in navigator){
-    navigator.serviceWorker.getRegistrations()
-      .then(registrations=>Promise.all(registrations.map(r=>r.unregister())))
-      .catch(()=>{});
-    if('caches' in window){
-      caches.keys().then(keys=>Promise.all(keys.map(key=>caches.delete(key)))).catch(()=>{});
-    }
+    navigator.serviceWorker.getRegistrations().then(registrations=>Promise.all(registrations.map(r=>r.unregister()))).catch(()=>{});
+    if('caches' in window)caches.keys().then(keys=>Promise.all(keys.map(key=>caches.delete(key)))).catch(()=>{});
   }
 
   const loadStyle=(file,key)=>{
     if(document.querySelector(`link[data-bunyan-module="${key}"]`))return;
     const link=document.createElement('link');
-    link.rel='stylesheet';
-    link.href=`./${file}?v=${release}`;
-    link.dataset.bunyanModule=key;
+    link.rel='stylesheet';link.href=`./${file}?v=${release}`;link.dataset.bunyanModule=key;
     link.onerror=()=>console.warn(`Optional stylesheet failed: ${file}`);
     document.head.appendChild(link);
   };
@@ -51,52 +39,20 @@
   const loadScript=(file,key)=>new Promise(resolve=>{
     if(document.querySelector(`script[data-bunyan-module="${key}"]`)){resolve();return;}
     const script=document.createElement('script');
-    script.src=`./${file}?v=${release}`;
-    script.async=false;
-    script.dataset.bunyanModule=key;
-    script.onload=resolve;
-    script.onerror=()=>{
-      console.warn(`Optional script failed: ${file}`);
-      resolve();
-    };
+    script.src=`./${file}?v=${release}`;script.async=false;script.dataset.bunyanModule=key;
+    script.onload=resolve;script.onerror=()=>{console.warn(`Optional script failed: ${file}`);resolve();};
     document.head.appendChild(script);
   });
 
   [
-    ['project-center.css','project-center-style'],
-    ['financial-center.css','financial-center-style'],
-    ['global-suite.css','global-suite-style'],
-    ['project-transparency.css','project-transparency-style'],
-    ['completion-suite.css','completion-suite-style'],
-    ['project-operations.css','project-operations-style'],
-    ['copy-link.css','copy-link-style'],
-    ['mobile-admin-fix.css','mobile-admin-fix-style'],
-    ['i18n-global.css','i18n-global-style'],
-    ['impact-upgrade.css','impact-upgrade-style'],
-    ['public-project-page.css','public-project-page-style'],
-    ['project-map.css','project-map-style'],
-    ['mobile-public-menu.css','mobile-public-menu-style']
+    ['project-center.css','project-center-style'],['financial-center.css','financial-center-style'],['global-suite.css','global-suite-style'],['project-transparency.css','project-transparency-style'],['completion-suite.css','completion-suite-style'],['project-operations.css','project-operations-style'],['copy-link.css','copy-link-style'],['mobile-admin-fix.css','mobile-admin-fix-style'],['i18n-global.css','i18n-global-style'],['impact-upgrade.css','impact-upgrade-style'],['public-project-page.css','public-project-page-style'],['project-map.css','project-map-style'],['mobile-public-menu.css','mobile-public-menu-style'],['language-selector.css','language-selector-style']
   ].forEach(([file,key])=>loadStyle(file,key));
 
   const modules=[
     ['i18n-global.js','i18n-global'],
+    ['language-selector.js','language-selector'],
     ['mobile-public-menu.js','mobile-public-menu'],
-    ['global-upgrade.js','global-manager'],
-    ['quick-project.js','quick-project'],
-    ['project-center.js','project-center'],
-    ['financial-center.js','financial-center'],
-    ['global-admin.js','global-admin'],
-    ['global-suite.js','global-suite'],
-    ['project-transparency.js','project-transparency'],
-    ['completion-suite.js','completion-suite'],
-    ['project-operations.js','project-operations'],
-    ['copy-link.js','copy-link'],
-    ['mobile-admin-fix.js','mobile-admin-fix'],
-    ['impact-upgrade.js','impact-upgrade'],
-    ['finance-transparency.js','finance-transparency'],
-    ['public-project-page.js','public-project-page'],
-    ['project-map.js','project-map'],
-    ['project-geo-admin.js','project-geo-admin']
+    ['global-upgrade.js','global-manager'],['quick-project.js','quick-project'],['project-center.js','project-center'],['financial-center.js','financial-center'],['global-admin.js','global-admin'],['global-suite.js','global-suite'],['project-transparency.js','project-transparency'],['completion-suite.js','completion-suite'],['project-operations.js','project-operations'],['copy-link.js','copy-link'],['mobile-admin-fix.js','mobile-admin-fix'],['impact-upgrade.js','impact-upgrade'],['finance-transparency.js','finance-transparency'],['public-project-page.js','public-project-page'],['project-map.js','project-map'],['project-geo-admin.js','project-geo-admin']
   ];
 
   (async()=>{
@@ -104,8 +60,5 @@
     window.BunyanI18n?.refresh?.();
     reveal();
     window.dispatchEvent(new CustomEvent('bunyan:ready',{detail:{release}}));
-  })().catch(error=>{
-    console.error('BUNYAN bootstrap failed:',error);
-    reveal();
-  });
+  })().catch(error=>{console.error('BUNYAN bootstrap failed:',error);reveal();});
 })();
