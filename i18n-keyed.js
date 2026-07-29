@@ -1,6 +1,5 @@
 (()=>{
 'use strict';
-const KEY='bunyan_language';
 const requested=new URLSearchParams(location.search).get('lang');
 let lang=(requested==='en'||requested==='ar')?requested:'ar';
 const dict={
@@ -45,23 +44,23 @@ const legacyPairs=[
 const arToEn=new Map(legacyPairs),enToAr=new Map(legacyPairs.map(([a,e])=>[e,a]));
 function t(key){return dict[lang]?.[key]??dict.ar[key]??key;}
 function applyStatic(root=document){
- root.querySelectorAll?.('[data-i18n]').forEach(el=>{const value=t(el.dataset.i18n); if(el.dataset.i18nHtml==='true')el.innerHTML=value.replace(/\n/g,'<br>');else el.textContent=value;});
+ root.querySelectorAll?.('[data-i18n]').forEach(el=>{const value=t(el.dataset.i18n);if(el.dataset.i18nHtml==='true')el.innerHTML=value.replace(/\n/g,'<br>');else el.textContent=value;});
  root.querySelectorAll?.('[data-i18n-placeholder]').forEach(el=>el.setAttribute('placeholder',t(el.dataset.i18nPlaceholder)));
 }
 function translateDynamic(root){
  const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let n;
  while((n=walker.nextNode())){if(!n.parentElement||n.parentElement.closest('[data-i18n],[data-no-i18n],script,style,textarea'))continue;const raw=n.nodeValue.trim();if(!raw)continue;const next=lang==='en'?arToEn.get(raw):enToAr.get(raw);if(next)n.nodeValue=n.nodeValue.replace(raw,next);}
 }
+function languageUrl(next){const url=new URL(location.origin+location.pathname);url.searchParams.set('lang',next);url.searchParams.set('v','20260729-native-language-links-1');return url.toString();}
 function mountSelector(){
  const nav=document.getElementById('nav');if(!nav)return;
- let wrap=document.getElementById('languageSelector');if(!wrap){wrap=document.createElement('div');wrap.id='languageSelector';wrap.className='language-selector';wrap.dataset.noI18n='true';wrap.innerHTML='<a href="?lang=ar" data-lang-link="ar">العربية</a><a href="?lang=en" data-lang-link="en">English</a>';nav.insertBefore(wrap,document.getElementById('adminBtn')||null);}
- wrap.querySelectorAll('[data-lang-link]').forEach(a=>{a.classList.toggle('active',a.dataset.langLink===lang);a.setAttribute('aria-current',a.dataset.langLink===lang?'true':'false');});
+ let wrap=document.getElementById('languageSelector');
+ if(!wrap){wrap=document.createElement('div');wrap.id='languageSelector';wrap.className='language-selector';wrap.dataset.noI18n='true';wrap.innerHTML='<a data-lang-link="ar">العربية</a><a data-lang-link="en">English</a>';nav.insertBefore(wrap,document.getElementById('adminBtn')||null);}
+ wrap.querySelectorAll('[data-lang-link]').forEach(a=>{a.href=languageUrl(a.dataset.langLink);a.classList.toggle('active',a.dataset.langLink===lang);a.setAttribute('aria-current',a.dataset.langLink===lang?'page':'false');});
 }
 function applyAll(root=document){document.documentElement.lang=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';document.body?.setAttribute('dir',document.documentElement.dir);document.title=lang==='ar'?'بُنْيَان | مؤسسة شمس الأنبياء للتنمية':'BUNYAN | Shams Al-Anbiya Foundation for Development';applyStatic(root);translateDynamic(root);mountSelector();}
-function setLanguage(next){next=next==='en'?'en':'ar';localStorage.setItem(KEY,next);const url=new URL(location.href);url.searchParams.set('lang',next);location.assign(url.toString());}
-document.addEventListener('click',e=>{const a=e.target.closest?.('[data-lang-link]');if(!a)return;e.preventDefault();setLanguage(a.dataset.langLink);},true);
 const observer=new MutationObserver(records=>{for(const r of records)for(const node of r.addedNodes)if(node.nodeType===1){applyStatic(node);translateDynamic(node);}});
-function init(){localStorage.setItem(KEY,lang);applyAll(document);observer.observe(document.body,{childList:true,subtree:true});}
+function init(){applyAll(document);observer.observe(document.body,{childList:true,subtree:true});}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
-window.BunyanI18n={getLanguage:()=>lang,setLanguage,t,refresh:()=>applyAll(document),dictionary:dict};
+window.BunyanI18n={getLanguage:()=>lang,setLanguage:next=>location.assign(languageUrl(next==='en'?'en':'ar')),t,refresh:()=>applyAll(document),dictionary:dict};
 })();
