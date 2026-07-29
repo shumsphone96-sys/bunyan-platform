@@ -20,9 +20,15 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: CORS_ORIGIN
-        value: https://shumsphone96-sys.github.io
+        value: https://bunyan-sudan.org,https://www.bunyan-sudan.org,https://shumsphone96-sys.github.io
       - key: ADMIN_PANEL_URL
-        value: https://shumsphone96-sys.github.io/bunyan-platform/
+        value: https://bunyan-sudan.org/v2/
+      - key: ADMIN_NAME
+        value: شمس الأنبياء أحمد
+      - key: ADMIN_EMAIL
+        value: shumsphone96@gmail.com
+      - key: ADMIN_PASSWORD
+        sync: false
       - key: NOTIFICATION_EMAIL
         value: shumsphone96@gmail.com
       - key: RESEND_API_KEY
