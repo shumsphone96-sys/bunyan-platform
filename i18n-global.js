@@ -2,7 +2,7 @@
 'use strict';
 const KEY='bunyan_language';
 const requested=new URLSearchParams(location.search).get('lang');
-let lang=(requested==='en'||requested==='ar')?requested:(localStorage.getItem(KEY)==='en'?'en':'ar');
+let lang=requested==='en'?'en':'ar';
 let applying=false,timer=0;
 localStorage.setItem(KEY,lang);
 const pairs=[
@@ -51,7 +51,7 @@ function translateElement(el){if(!el?.getAttribute||el.closest?.('[data-no-i18n]
 function mountSelector(){const nav=document.getElementById('nav');if(!nav)return;let wrap=document.getElementById('languageSelector');if(!wrap){wrap=document.createElement('div');wrap.id='languageSelector';wrap.className='language-selector';wrap.dataset.noI18n='true';wrap.innerHTML='<button type="button" data-set-language="ar">العربية</button><button type="button" data-set-language="en">English</button>';nav.insertBefore(wrap,document.getElementById('adminBtn')||null);}wrap.querySelectorAll('[data-set-language]').forEach(b=>{const active=b.dataset.setLanguage===lang;b.classList.toggle('active',active);b.setAttribute('aria-pressed',active?'true':'false');});}
 function paint(root=document.body){if(!root||applying)return;applying=true;try{if(root.nodeType===Node.TEXT_NODE)translateNode(root);else{translateElement(root);const w=document.createTreeWalker(root,NodeFilter.SHOW_ELEMENT|NodeFilter.SHOW_TEXT);let n;while((n=w.nextNode()))n.nodeType===Node.TEXT_NODE?translateNode(n):translateElement(n);}mountSelector();}finally{applying=false;}}
 function direction(){document.documentElement.lang=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';document.body?.setAttribute('dir',document.documentElement.dir);document.body?.classList.toggle('lang-ar',lang==='ar');document.body?.classList.toggle('lang-en',lang==='en');document.title=lang==='ar'?'بُنْيَان | مؤسسة شمس الأنبياء للتنمية':'BUNYAN | Shams Al-Anbiya Foundation for Development';}
-function setLanguage(next){lang=next==='en'?'en':'ar';localStorage.setItem(KEY,lang);const url=new URL(location.href);url.searchParams.set('lang',lang);history.replaceState(null,'',url);direction();paint(document.body);setTimeout(()=>paint(document.body),100);setTimeout(()=>paint(document.body),600);window.dispatchEvent(new CustomEvent('bunyan:languagechange',{detail:{lang}}));}
+function setLanguage(next){const target=next==='en'?'en':'ar';localStorage.setItem(KEY,target);const url=new URL(location.href);url.searchParams.set('lang',target);url.searchParams.set('lv','20260729-url-reload-2');location.assign(url.toString());}
 document.addEventListener('click',e=>{const explicit=e.target.closest?.('[data-set-language]');if(explicit){e.preventDefault();e.stopImmediatePropagation();setLanguage(explicit.dataset.setLanguage);return;}const toggle=e.target.closest?.('[data-language-toggle="true"],#languageToggle,#toggleLang');if(toggle){e.preventDefault();e.stopImmediatePropagation();setLanguage(lang==='ar'?'en':'ar');}},true);
 const observer=new MutationObserver(records=>{if(applying)return;clearTimeout(timer);timer=setTimeout(()=>{for(const r of records)for(const n of r.addedNodes)paint(n);},40);});
 function init(){direction();paint(document.body);observer.observe(document.documentElement,{childList:true,subtree:true});setTimeout(()=>paint(document.body),300);setTimeout(()=>paint(document.body),1200);}
