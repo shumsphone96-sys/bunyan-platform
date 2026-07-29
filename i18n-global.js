@@ -2,13 +2,13 @@
 'use strict';
 const KEY='bunyan_language';
 let lang=localStorage.getItem(KEY)==='en'?'en':'ar';
-let applying=false;
+let applying=false,scheduled=false;
 const textState=new WeakMap(),attrState=new WeakMap();
 const D={
 'بُنْيَان':'BUNYAN','مؤسسة شمس الأنبياء للتنمية':'Shams Al-Anbiya Foundation for Development','هنا يُبنى الإنسان':'Building people here','الإنسان أولاً':'People First',
 'من نحن':'About Us','البرامج':'Programs','المشروعات':'Projects','الأخبار':'News','شارك معنا':'Join Us','اتصل بنا':'Contact Us','لوحة الإدارة':'Admin Dashboard','الأثر':'Impact','الشفافية':'Transparency','خريطة الأثر':'Impact Map',
 'من المجتمع المحلي إلى أثر مستدام':'From local community to sustainable impact','نبني الإنسان':'We build people','ليَبني المستقبل':'to build the future','شاهد مشروعاتنا':'View Our Projects','انضم إلى البُنْيَان':'Join BUNYAN',
-'مجالات تنموية':'Development Fields','مبادرة مستهدفة':'Target Initiatives','متطوعاً مستهدفاً':'Target Volunteers','مستفيد مستهدف':'Target Beneficiaries','الإنسان أولاً':'People First','العدالة':'Justice','الاستدامة':'Sustainability',
+'مجالات تنموية':'Development Fields','مبادرة مستهدفة':'Target Initiatives','متطوعاً مستهدفاً':'Target Volunteers','مستفيد مستهدف':'Target Beneficiaries','العدالة':'Justice','الاستدامة':'Sustainability',
 'برامج بُنْيَان':'BUNYAN Programs','التعليم والمعرفة':'Education and Knowledge','الصحة والمجتمع':'Health and Community','التمكين الاقتصادي':'Economic Empowerment','التحول الرقمي':'Digital Transformation',
 'من الفكرة إلى أثر يُرى':'From idea to visible impact','ساهم في المشروع':'Support Project','عرض تفاصيل المشروع':'View Project Details','عرض صفحة المشروع':'View Project Page','الميزانية':'Budget','حالة التنفيذ':'Implementation Status','قيد النشر':'Pending Publication','في مرحلة الإعداد':'Preparation Stage','آخر تحديث: لم يُنشر':'Last update: not published',
 'الأثر بالأرقام':'Impact in Numbers','نفصل بين الطموح والنتيجة':'We separate ambition from results','الأهداف المستهدفة':'Target Goals','النتائج الموثقة':'Verified Results','المجالات التنموية':'Development Fields','المبادرات المستهدفة':'Target Initiatives','المتطوعون المستهدفون':'Target Volunteers','المستفيدون المستهدفون':'Target Beneficiaries','المشروعات المكتملة':'Completed Projects','المستفيدون الموثقون':'Verified Beneficiaries','المساهمات المؤكدة':'Verified Contributions','ساعات التطوع':'Volunteer Hours','قيد التوثيق':'Pending Documentation','بعد اعتماد تقارير الفرق':'After team reports are approved',
@@ -26,41 +26,20 @@ const D={
 const R=Object.fromEntries(Object.entries(D).map(([ar,en])=>[en,ar]));
 const clean=v=>String(v??'').replace(/\s+/g,' ').trim();
 const hasArabic=v=>/[\u0600-\u06FF]/.test(v);
-function pattern(v,target){
- const s=clean(v); let m;
- if(target==='en'){
-  if((m=s.match(/^(\d+)\s*مشروع(?:اً|ات)?$/)))return `${m[1]} Projects`;
-  if((m=s.match(/^(\d+)\s*سجل$/)))return `${m[1]} Records`;
-  if((m=s.match(/^(\d+)\s*عملية موثقة$/)))return `${m[1]} Verified Transactions`;
-  if((m=s.match(/^الإنجاز\s*(\d+)%$/)))return `Progress ${m[1]}%`;
-  if((m=s.match(/^(\d+)%\s*موثق$/)))return `${m[1]}% Verified`;
-  if((m=s.match(/^آخر تحديث:\s*(.+)$/)))return `Last update: ${m[1]}`;
- }else{
-  if((m=s.match(/^(\d+)\s*Projects?$/i)))return `${m[1]} مشروع`;
-  if((m=s.match(/^(\d+)\s*Records?$/i)))return `${m[1]} سجل`;
-  if((m=s.match(/^(\d+)\s*Verified Transactions?$/i)))return `${m[1]} عملية موثقة`;
-  if((m=s.match(/^Progress\s*(\d+)%$/i)))return `الإنجاز ${m[1]}%`;
-  if((m=s.match(/^(\d+)%\s*Verified$/i)))return `${m[1]}% موثق`;
-  if((m=s.match(/^Last update:\s*(.+)$/i)))return `آخر تحديث: ${m[1]}`;
- }
- return null;
-}
-function translate(v,target){const s=clean(v);if(!s)return v;const exact=target==='en'?D[s]:R[s];return exact??pattern(s,target)??v;}
-function captureText(n){
- const raw=n.nodeValue;if(!clean(raw))return null;const s=clean(raw);let ar,en;
- if(D[s]){ar=s;en=D[s]}else if(R[s]){ar=R[s];en=s}else if(hasArabic(s)){ar=s;en=translate(s,'en')}else{en=s;ar=translate(s,'ar')}
- const rec={ar,en,prefix:(raw.match(/^\s*/)||[''])[0],suffix:(raw.match(/\s*$/)||[''])[0]};textState.set(n,rec);return rec;
-}
-function applyText(n,force=false){if(!n||n.nodeType!==3||/^(SCRIPT|STYLE|TEXTAREA)$/i.test(n.parentElement?.tagName||'')||n.parentElement?.closest?.('[data-no-i18n]'))return;let rec=textState.get(n);if(!rec||force)rec=captureText(n);if(!rec)return;const out=lang==='en'?rec.en:rec.ar;n.nodeValue=rec.prefix+out+rec.suffix;}
-function applyAttrs(el,force=false){if(!el?.getAttribute||el.closest?.('[data-no-i18n]'))return;let store=attrState.get(el);if(!store||force){store={};for(const a of ['placeholder','title','aria-label']){if(el.hasAttribute(a)){const v=el.getAttribute(a),s=clean(v);store[a]={ar:D[s]?s:R[s]||s,en:D[s]||s};}}attrState.set(el,store)}for(const [a,r] of Object.entries(store)){el.setAttribute(a,lang==='en'?r.en:r.ar)}}
-function markToggle(el){el.dataset.languageToggle='true';el.type=el.tagName==='BUTTON'?'button':el.type;el.textContent=lang==='ar'?'English':'العربية';el.setAttribute('aria-label',lang==='ar'?'Switch to English':'التبديل إلى العربية')}
-function ensureToggle(){let b=document.querySelector('[data-language-toggle="true"],#languageToggle');if(!b){const nav=document.querySelector('#nav');if(nav){b=document.createElement('button');b.id='languageToggle';b.className='outline language-toggle';nav.insertBefore(b,document.querySelector('#adminBtn')||null)}}if(b)markToggle(b);document.querySelectorAll('#toggleLang').forEach(markToggle)}
-function walk(root=document.body,force=false){if(!root)return;applying=true;try{if(root.nodeType===3)applyText(root,force);else{applyAttrs(root,force);const w=document.createTreeWalker(root,NodeFilter.SHOW_ELEMENT|NodeFilter.SHOW_TEXT);let n;while((n=w.nextNode()))n.nodeType===3?applyText(n,force):applyAttrs(n,force)}ensureToggle()}finally{applying=false}}
+function pattern(v,target){const s=clean(v);let m;if(target==='en'){if((m=s.match(/^(\d+)\s*مشروع(?:اً|ات)?$/)))return `${m[1]} Projects`;if((m=s.match(/^(\d+)\s*سجل$/)))return `${m[1]} Records`;if((m=s.match(/^(\d+)\s*عملية موثقة$/)))return `${m[1]} Verified Transactions`;if((m=s.match(/^الإنجاز\s*(\d+)%$/)))return `Progress ${m[1]}%`;if((m=s.match(/^(\d+)%\s*موثق$/)))return `${m[1]}% Verified`;if((m=s.match(/^آخر تحديث:\s*(.+)$/)))return `Last update: ${m[1]}`;}else{if((m=s.match(/^(\d+)\s*Projects?$/i)))return `${m[1]} مشروع`;if((m=s.match(/^(\d+)\s*Records?$/i)))return `${m[1]} سجل`;if((m=s.match(/^(\d+)\s*Verified Transactions?$/i)))return `${m[1]} عملية موثقة`;if((m=s.match(/^Progress\s*(\d+)%$/i)))return `الإنجاز ${m[1]}%`;if((m=s.match(/^(\d+)%\s*Verified$/i)))return `${m[1]}% موثق`;if((m=s.match(/^Last update:\s*(.+)$/i)))return `آخر تحديث: ${m[1]}`;}return null;}
+function translate(v,target){const s=clean(v);if(!s)return v;return (target==='en'?D[s]:R[s])??pattern(s,target)??v;}
+function captureText(n){const raw=n.nodeValue;if(!clean(raw))return null;const s=clean(raw);let ar,en;if(D[s]){ar=s;en=D[s]}else if(R[s]){ar=R[s];en=s}else if(hasArabic(s)){ar=s;en=translate(s,'en')}else{en=s;ar=translate(s,'ar')}const rec={ar,en,prefix:(raw.match(/^\s*/)||[''])[0],suffix:(raw.match(/\s*$/)||[''])[0]};textState.set(n,rec);return rec;}
+function applyText(n,force=false){if(!n||n.nodeType!==3||/^(SCRIPT|STYLE|TEXTAREA)$/i.test(n.parentElement?.tagName||'')||n.parentElement?.closest?.('[data-no-i18n]'))return;let rec=textState.get(n);if(!rec||force)rec=captureText(n);if(!rec)return;const out=lang==='en'?rec.en:rec.ar;const value=rec.prefix+out+rec.suffix;if(n.nodeValue!==value)n.nodeValue=value;}
+function applyAttrs(el,force=false){if(!el?.getAttribute||el.closest?.('[data-no-i18n]'))return;let store=attrState.get(el);if(!store||force){store={};for(const a of ['placeholder','title','aria-label'])if(el.hasAttribute(a)){const v=el.getAttribute(a),s=clean(v);store[a]={ar:D[s]?s:R[s]||s,en:D[s]||s};}attrState.set(el,store)}for(const [a,r] of Object.entries(store)){const value=lang==='en'?r.en:r.ar;if(el.getAttribute(a)!==value)el.setAttribute(a,value)}}
+function markToggle(el){if(!el)return;el.dataset.languageToggle='true';if(el.tagName==='BUTTON'&&el.type!=='button')el.type='button';const text=lang==='ar'?'English':'العربية';const label=lang==='ar'?'Switch to English':'التبديل إلى العربية';if(el.textContent!==text)el.textContent=text;if(el.getAttribute('aria-label')!==label)el.setAttribute('aria-label',label);}
+function ensureToggle(){let b=document.querySelector('[data-language-toggle="true"],#languageToggle');if(!b){const nav=document.querySelector('#nav');if(nav){b=document.createElement('button');b.id='languageToggle';b.className='outline language-toggle';nav.insertBefore(b,document.querySelector('#adminBtn')||null)}}markToggle(b);document.querySelectorAll('#toggleLang').forEach(markToggle);}
+function walk(root=document.body,force=false){if(!root||applying)return;applying=true;try{if(root.nodeType===3)applyText(root,force);else{applyAttrs(root,force);const w=document.createTreeWalker(root,NodeFilter.SHOW_ELEMENT|NodeFilter.SHOW_TEXT);let n;while((n=w.nextNode()))n.nodeType===3?applyText(n,force):applyAttrs(n,force)}ensureToggle()}finally{applying=false}}
 function direction(){document.documentElement.lang=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';if(document.body){document.body.dir=document.documentElement.dir;document.body.classList.toggle('lang-ar',lang==='ar');document.body.classList.toggle('lang-en',lang==='en')}document.title=lang==='ar'?'بُنْيَان | مؤسسة شمس الأنبياء للتنمية':'BUNYAN | Shams Al-Anbiya Foundation for Development'}
-function setLanguage(next){lang=next==='en'?'en':'ar';localStorage.setItem(KEY,lang);direction();walk(document.body);window.dispatchEvent(new CustomEvent('bunyan:languagechange',{detail:{lang}}));setTimeout(()=>walk(document.body),100);setTimeout(()=>walk(document.body),700)}
+function setLanguage(next){lang=next==='en'?'en':'ar';localStorage.setItem(KEY,lang);direction();walk(document.body);window.dispatchEvent(new CustomEvent('bunyan:languagechange',{detail:{lang}}));setTimeout(()=>walk(document.body),120);setTimeout(()=>walk(document.body),700)}
 document.addEventListener('click',e=>{const el=e.target.closest?.('[data-language-toggle="true"],#toggleLang,#languageToggle');if(!el)return;e.preventDefault();e.stopImmediatePropagation();setLanguage(lang==='ar'?'en':'ar')},true);
-const observer=new MutationObserver(records=>{if(applying)return;for(const r of records){if(r.type==='characterData')applyText(r.target,true);else for(const n of r.addedNodes)walk(n,true)}ensureToggle()});
-function init(){direction();walk(document.body,true);observer.observe(document.documentElement,{childList:true,subtree:true,characterData:true});setTimeout(()=>walk(document.body,true),400);setTimeout(()=>walk(document.body,true),1500)}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
-window.BunyanI18n={getLanguage:()=>lang,setLanguage,t:key=>lang==='en'?(D[key]||key):(R[key]||key),refresh:()=>walk(document.body,true),dictionary:D};
+function scheduleRefresh(){if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{scheduled=false;walk(document.body,false)});}
+const observer=new MutationObserver(records=>{if(applying)return;let needs=false;for(const r of records){if(r.type==='childList'&&r.addedNodes.length){needs=true;break}}if(needs)scheduleRefresh();});
+function init(){direction();walk(document.body,true);observer.observe(document.documentElement,{childList:true,subtree:true});setTimeout(()=>walk(document.body,false),500);setTimeout(()=>walk(document.body,false),1600)}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
+window.BunyanI18n={getLanguage:()=>lang,setLanguage,t:key=>lang==='en'?(D[key]||key):(R[key]||key),refresh:()=>walk(document.body,false),dictionary:D};
 })();
