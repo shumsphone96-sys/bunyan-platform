@@ -3,14 +3,14 @@ import fs from 'node:fs/promises';
 const sourceUrl=new URL('./server-v8.js',import.meta.url);
 let source=await fs.readFile(sourceUrl,'utf8');
 
-source=source.replaceAll("version:'8.0.0'","version:'10.1.0'").replaceAll('BUNYAN Cloud API 8.0.0','BUNYAN Cloud API 10.1.0');
+source=source.replaceAll("version:'8.0.0'","version:'10.1.1'").replaceAll('BUNYAN Cloud API 8.0.0','BUNYAN Cloud API 10.1.1');
 source=source.replace(
   "app.use('/api/',rateLimit({windowMs:15*60*1000,limit:400,standardHeaders:'draft-7',legacyHeaders:false,message:{error:'طلبات كثيرة. حاول لاحقاً.'}}));",
   "app.use('/api/',rateLimit({windowMs:15*60*1000,limit:1200,skip:req=>req.method==='GET'||req.method==='HEAD'||req.method==='OPTIONS',standardHeaders:'draft-7',legacyHeaders:false,message:{error:'طلبات كثيرة. حاول بعد دقائق.'}}));"
 );
 source=source.replace(
-  "SELECT id,title,amount,currency,spent_at,category,notes FROM project_expenses WHERE project_id=$1 AND is_public=true ORDER BY spent_at DESC",
-  "SELECT id,title,amount,currency,spent_at,category,notes,status,verified_at FROM project_expenses WHERE project_id=$1 AND is_public=true AND status='verified' ORDER BY spent_at DESC"
+  "pool.query('SELECT id,title,amount,currency,spent_at,category,notes FROM project_expenses WHERE project_id=$1 AND is_public=true ORDER BY spent_at DESC',[id])",
+  "pool.query(\"SELECT id,title,amount,currency,spent_at,category,notes,status,verified_at FROM project_expenses WHERE project_id=$1 AND is_public=true AND status='verified' ORDER BY spent_at DESC\",[id])"
 );
 source=source.replace(
   "expenses:{table:'project_expenses',fields:['project_id','title','amount','currency','spent_at','category','notes','is_public']}",
