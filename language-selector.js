@@ -1,6 +1,12 @@
 (()=>{
   'use strict';
-  const KEY='bunyan_language';
+  const current=()=>new URLSearchParams(location.search).get('lang')==='en'?'en':'ar';
+  const hrefFor=lang=>{
+    const url=new URL(location.href);
+    url.searchParams.set('lang',lang);
+    url.searchParams.set('v','20260729-url-language-final-1');
+    return url.pathname+url.search+url.hash;
+  };
   const mount=()=>{
     const nav=document.getElementById('nav');
     if(!nav)return;
@@ -12,33 +18,16 @@
       wrap.setAttribute('role','group');
       wrap.setAttribute('aria-label','Language selector');
       wrap.setAttribute('data-no-i18n','true');
-      wrap.innerHTML='<button type="button" data-set-language="ar">العربية</button><button type="button" data-set-language="en">English</button>';
       const admin=document.getElementById('adminBtn');
       nav.insertBefore(wrap,admin||null);
     }
-    const refresh=()=>{
-      const current=localStorage.getItem(KEY)==='en'?'en':'ar';
-      wrap.querySelectorAll('[data-set-language]').forEach(btn=>{
-        const active=btn.dataset.setLanguage===current;
-        btn.classList.toggle('active',active);
-        btn.setAttribute('aria-pressed',active?'true':'false');
-      });
-    };
-    wrap.addEventListener('click',e=>{
-      const btn=e.target.closest('[data-set-language]');
-      if(!btn)return;
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      const next=btn.dataset.setLanguage==='en'?'en':'ar';
-      localStorage.setItem(KEY,next);
-      document.documentElement.lang=next;
-      document.documentElement.dir=next==='ar'?'rtl':'ltr';
-      const url=new URL(location.href);
-      url.searchParams.set('lang',next);
-      url.searchParams.set('v','20260729-language-reload-fix-1');
-      location.replace(url.toString());
-    },true);
-    refresh();
+    wrap.innerHTML=`<a data-set-language="ar" href="${hrefFor('ar')}">العربية</a><a data-set-language="en" href="${hrefFor('en')}">English</a>`;
+    const active=current();
+    wrap.querySelectorAll('[data-set-language]').forEach(link=>{
+      const isActive=link.dataset.setLanguage===active;
+      link.classList.toggle('active',isActive);
+      link.setAttribute('aria-current',isActive?'true':'false');
+    });
   };
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});else mount();
   window.addEventListener('bunyan:ready',mount);
