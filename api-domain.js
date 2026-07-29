@@ -3,7 +3,7 @@
 
   const official='https://api.bunyan-sudan.org';
   const render='https://bunyan-api-qhkf.onrender.com';
-  const release='20260729-native-language-router-2';
+  const release='20260729-admin-login-resilience-1';
 
   window.BUNYAN_API_ORIGINS=[official,render];
   window.BUNYAN_API_ORIGIN=official;
@@ -42,7 +42,7 @@
   });
 
   [
-    ['project-center.css','project-center-style'],['financial-center.css','financial-center-style'],['global-suite.css','global-suite-style'],['project-transparency.css','project-transparency-style'],['completion-suite.css','completion-suite-style'],['project-operations.css','project-operations-style'],['copy-link.css','copy-link-style'],['mobile-admin-fix.css','mobile-admin-fix-style'],['i18n-global.css','i18n-global-style'],['impact-upgrade.css','impact-upgrade-style'],['public-project-page.css','public-project-page-style'],['project-map.css','project-map-style'],['mobile-public-menu.css','mobile-public-menu-style'],['language-selector.css','language-selector-style']
+    ['project-center.css','project-center-style'],['financial-center.css','financial-center-style'],['global-suite.css','global-suite-style'],['project-transparency.css','project-transparency-style'],['completion-suite.css','completion-suite-style'],['project-operations.css','project-operations-style'],['copy-link.css','copy-link-style'],['mobile-admin-fix.css','mobile-admin-fix-style'],['i18n-global.css','i18n-global-style'],['impact-upgrade.css','impact-upgrade-style'],['public-project-page.css','public-project-page-style'],['project-map.css','project-map-style'],['mobile-public-menu.css','mobile-public-menu-style'],['language-selector.css','language-selector-style'],['admin-access-fix.css','admin-access-fix-style']
   ].forEach(([file,key])=>loadStyle(file,key));
 
   const modules=[
@@ -50,6 +50,7 @@
     ['i18n-bindings.js','i18n-bindings'],
     ['i18n-keyed.js','i18n-keyed'],
     ['public-locale-render.js','public-locale-render'],
+    ['admin-access-fix.js','admin-access-fix'],
     ['mobile-public-menu.js','mobile-public-menu'],
     ['global-upgrade.js','global-manager'],['quick-project.js','quick-project'],['project-center.js','project-center'],['financial-center.js','financial-center'],['global-admin.js','global-admin'],['global-suite.js','global-suite'],['project-transparency.js','project-transparency'],['completion-suite.js','completion-suite'],['project-operations.js','project-operations'],['copy-link.js','copy-link'],['mobile-admin-fix.js','mobile-admin-fix'],['impact-upgrade.js','impact-upgrade'],['finance-transparency.js','finance-transparency'],['public-project-page.js','public-project-page'],['project-map.js','project-map'],['project-geo-admin.js','project-geo-admin']
   ];
