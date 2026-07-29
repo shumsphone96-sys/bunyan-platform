@@ -167,6 +167,23 @@ UPDATE participation_requests SET status='review' WHERE status='contacted';
 UPDATE participation_requests SET status='completed' WHERE status='closed';
 ALTER TABLE participation_requests ADD CONSTRAINT participation_requests_status_check CHECK (status IN ('new','review','accepted','rejected','completed'));
 
+CREATE SEQUENCE IF NOT EXISTS help_request_number_seq START 1;
+CREATE TABLE IF NOT EXISTS help_requests (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tracking_number text UNIQUE NOT NULL,
+  full_name text NOT NULL,
+  phone text NOT NULL,
+  location text NOT NULL,
+  case_type text NOT NULL,
+  description text NOT NULL,
+  requested_amount numeric(14,2),
+  currency text NOT NULL DEFAULT 'SDG',
+  status text NOT NULL DEFAULT 'new' CHECK (status IN ('new','review','approved','rejected','completed')),
+  admin_notes text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS request_notes (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   request_id uuid NOT NULL REFERENCES participation_requests(id) ON DELETE CASCADE,
@@ -205,6 +222,7 @@ CREATE INDEX IF NOT EXISTS idx_project_files_project ON project_files(project_id
 CREATE INDEX IF NOT EXISTS idx_donations_status ON donations(status,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_donation_attachments_donation ON donation_attachments(donation_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_requests_status ON participation_requests(status,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_help_requests_status ON help_requests(status,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_request_notes_request ON request_notes(request_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_request_attachments_request ON request_attachments(request_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_user_created ON audit_logs(user_id,created_at DESC);
