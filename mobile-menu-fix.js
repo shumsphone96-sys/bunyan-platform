@@ -10,6 +10,7 @@
     menu.textContent=open?'×':'☰';
   };
 
+  menu.onclick=null;
   menu.setAttribute('aria-controls','nav');
   menu.setAttribute('aria-expanded','false');
 
