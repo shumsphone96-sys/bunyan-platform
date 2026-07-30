@@ -1,0 +1,16 @@
+@media (max-width:900px){
+  body>header{position:sticky;overflow:visible}
+  #menu{display:grid;width:46px;height:46px;place-items:center;border:1px solid #d7aa4b66;border-radius:12px;background:#fff;color:#12231f;font-size:24px;line-height:1;z-index:32}
+  #nav{display:flex!important;position:absolute;top:calc(100% + 8px);inset-inline-start:6vw;inset-inline-end:auto;width:min(285px,88vw);max-height:calc(100vh - 110px);overflow:auto;background:#fff;padding:10px;border:1px solid #dfe5e1;border-radius:16px;box-shadow:0 18px 55px #071a1730;flex-direction:column;align-items:stretch;gap:3px;opacity:0;visibility:hidden;pointer-events:none;transform:translateY(-8px) scale(.98);transform-origin:top left;transition:opacity .18s ease,transform .18s ease,visibility .18s;z-index:31}
+  html[dir="rtl"] #nav{transform-origin:top left}
+  html[dir="ltr"] #nav{inset-inline-start:auto;inset-inline-end:6vw;transform-origin:top right}
+  #nav.open{opacity:1;visibility:visible;pointer-events:auto;transform:translateY(0) scale(1)}
+  #nav>a{display:block;padding:11px 13px;border-radius:10px;font-size:15px;text-align:start}
+  #nav>a:hover,#nav>a:focus{background:#f5f2e9}
+  #nav .language-selector{display:grid;grid-template-columns:1fr 1fr;margin:6px 0;border:1px solid #dfe5e1;border-radius:11px;overflow:hidden}
+  #nav .language-selector a{padding:10px 8px;text-align:center;font-size:14px;background:#fff}
+  #nav .language-selector a+ a{border-inline-start:1px solid #dfe5e1}
+  #nav .language-selector a[aria-current="true"],#nav .language-selector a.active{background:#f5f2e9;color:#7b5a18;font-weight:700}
+  #nav #adminBtn{width:100%;padding:11px 14px;margin-top:3px}
+  body.menu-open{overflow:auto}
+}
