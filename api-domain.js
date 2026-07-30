@@ -3,7 +3,7 @@
 
   const official='https://api.bunyan-sudan.org';
   const render='https://bunyan-api-qhkf.onrender.com';
-  const release='20260729-standalone-admin-route-1';
+  const release='20260730-menu-final-1';
 
   window.BUNYAN_API_ORIGINS=[official,render];
   window.BUNYAN_API_ORIGIN=official;
@@ -42,7 +42,7 @@
   });
 
   [
-    ['project-center.css','project-center-style'],['financial-center.css','financial-center-style'],['global-suite.css','global-suite-style'],['project-transparency.css','project-transparency-style'],['completion-suite.css','completion-suite-style'],['project-operations.css','project-operations-style'],['copy-link.css','copy-link-style'],['mobile-admin-fix.css','mobile-admin-fix-style'],['i18n-global.css','i18n-global-style'],['impact-upgrade.css','impact-upgrade-style'],['public-project-page.css','public-project-page-style'],['project-map.css','project-map-style'],['mobile-public-menu.css','mobile-public-menu-style'],['language-selector.css','language-selector-style'],['admin-access-fix.css','admin-access-fix-style']
+    ['project-center.css','project-center-style'],['financial-center.css','financial-center-style'],['global-suite.css','global-suite-style'],['project-transparency.css','project-transparency-style'],['completion-suite.css','completion-suite-style'],['project-operations.css','project-operations-style'],['copy-link.css','copy-link-style'],['mobile-admin-fix.css','mobile-admin-fix-style'],['i18n-global.css','i18n-global-style'],['impact-upgrade.css','impact-upgrade-style'],['public-project-page.css','public-project-page-style'],['project-map.css','project-map-style'],['mobile-public-menu.css','mobile-public-menu-style'],['language-selector.css','language-selector-style'],['admin-access-fix.css','admin-access-fix-style'],['menu-final-fix.css','menu-final-fix-style']
   ].forEach(([file,key])=>loadStyle(file,key));
 
   const modules=[
@@ -52,7 +52,7 @@
     ['public-locale-render.js','public-locale-render'],
     ['admin-access-fix.js','admin-access-fix'],
     ['mobile-public-menu.js','mobile-public-menu'],
-    ['global-upgrade.js','global-manager'],['quick-project.js','quick-project'],['project-center.js','project-center'],['financial-center.js','financial-center'],['global-admin.js','global-admin'],['global-suite.js','global-suite'],['project-transparency.js','project-transparency'],['completion-suite.js','completion-suite'],['project-operations.js','project-operations'],['copy-link.js','copy-link'],['mobile-admin-fix.js','mobile-admin-fix'],['impact-upgrade.js','impact-upgrade'],['finance-transparency.js','finance-transparency'],['public-project-page.js','public-project-page'],['project-map.js','project-map'],['project-geo-admin.js','project-geo-admin']
+    ['global-upgrade.js','global-manager'],['quick-project.js','quick-project'],['project-center.js','project-center'],['financial-center.js','financial-center'],['global-admin.js','global-admin'],['global-suite.js','global-suite'],['project-transparency.js','project-transparency'],['completion-suite.js','completion-suite'],['project-operations.js','project-operations'],['copy-link.js','copy-link'],['mobile-admin-fix.js','mobile-admin-fix'],['impact-upgrade.js','impact-upgrade'],['finance-transparency.js','finance-transparency'],['public-project-page.js','public-project-page'],['project-map.js','project-map'],['project-geo-admin.js','project-geo-admin'],['menu-final-fix.js','menu-final-fix']
   ];
 
   (async()=>{
@@ -60,6 +60,7 @@
     window.BunyanI18nBindings?.bind?.();
     window.BunyanI18n?.refresh?.();
     window.BunyanPublicLocale?.render?.();
+    await loadScript('menu-final-fix.js','menu-final-fix-last');
     reveal();
     window.dispatchEvent(new CustomEvent('bunyan:ready',{detail:{release}}));
   })().catch(error=>{console.error('BUNYAN bootstrap failed:',error);reveal();});
