@@ -1,18 +1,9 @@
 (()=>{
   'use strict';
-  const release='20260731-project-v4-1';
-  if(!document.querySelector('link[data-project-v4]')){
-    const style=document.createElement('link');
-    style.rel='stylesheet';
-    style.href=`./project-v4.css?v=${release}`;
-    style.dataset.projectV4='1';
-    document.head.appendChild(style);
-  }
-  if(!document.querySelector('script[data-project-v4]')){
-    const script=document.createElement('script');
-    script.src=`./project-v4.js?v=${release}`;
-    script.async=false;
-    script.dataset.projectV4='1';
-    document.head.appendChild(script);
-  }
+  const release='20260731-project-lifecycle-2';
+  const addStyle=(href,key)=>{if(document.querySelector(`link[data-${key}]`))return;const style=document.createElement('link');style.rel='stylesheet';style.href=`./${href}?v=${release}`;style.setAttribute(`data-${key}`,'1');document.head.appendChild(style)};
+  const addScript=(src,key,onload)=>{if(document.querySelector(`script[data-${key}]`)){onload?.();return}const script=document.createElement('script');script.src=`./${src}?v=${release}`;script.async=false;script.setAttribute(`data-${key}`,'1');if(onload)script.onload=onload;document.head.appendChild(script)};
+  addStyle('project-v4.css','project-v4');
+  addStyle('project-lifecycle.css','project-lifecycle');
+  addScript('project-v4.js','project-v4',()=>addScript('project-lifecycle.js','project-lifecycle'));
 })();
