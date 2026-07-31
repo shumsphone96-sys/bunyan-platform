@@ -3,7 +3,7 @@
 
   const official='https://api.bunyan-sudan.org';
   const render='https://bunyan-api-qhkf.onrender.com';
-  const release='20260731-executive-force-v9-4';
+  const release='20260731-stability-v1-1';
 
   window.BUNYAN_API_ORIGINS=[official,render];
   window.BUNYAN_API_ORIGIN=official;
@@ -63,12 +63,14 @@
     window.BunyanPublicLocale?.render?.();
     await loadScript('menu-final-fix.js','menu-final-fix-last');
     await loadScript('executive-dashboard-v9.js','executive-dashboard-v9-force-last');
+    await loadScript('stability-v1.js','stability-v1-last');
     reveal();
     window.dispatchEvent(new CustomEvent('bunyan:ready',{detail:{release}}));
     setTimeout(()=>{
       const dash=document.getElementById('dash');
       const title=document.getElementById('dashTitle');
       if(dash?.classList.contains('open')&&title?.textContent?.trim()==='نظرة عامة')window.openExecutiveDashboard?.();
+      window.BunyanStability?.run?.();
     },900);
   })().catch(error=>{console.error('BUNYAN bootstrap failed:',error);reveal();});
 })();
