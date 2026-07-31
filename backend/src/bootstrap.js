@@ -7,8 +7,6 @@ import { z } from 'zod';
 import { readFile, writeFile } from 'node:fs/promises';
 
 // Keep the strict login limiter, but raise the general API allowance.
-// The frontend loads several live modules, so the old global limit of 400
-// could be exhausted and block a correct administrator login.
 const sourceUrl=new URL('./server-v8.js',import.meta.url);
 const runtimeUrl=new URL('./server-runtime.js',import.meta.url);
 const source=await readFile(sourceUrl,'utf8');
@@ -24,8 +22,8 @@ const originalListen=express.application.listen;
 express.application.listen=function(...args){app=this;return originalListen.apply(this,args)};
 await import('./server-runtime.js');
 express.application.listen=originalListen;
-
 if(!app)throw new Error('BUNYAN Express application was not captured');
+
 const {Pool}=pg;
 const pool=new Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.NODE_ENV==='production'?{rejectUnauthorized:false}:false});
 const secret=process.env.JWT_SECRET;
@@ -34,6 +32,29 @@ const publicWriteLimit=rateLimit({windowMs:60*60*1000,limit:30,standardHeaders:'
 const asyncRoute=fn=>(req,res,next)=>Promise.resolve(fn(req,res,next)).catch(next);
 function auth(req,res,next){const token=req.headers.authorization?.replace(/^Bearer\s+/i,'');if(!token)return res.status(401).json({error:'يلزم تسجيل الدخول'});try{req.user=jwt.verify(token,secret,{issuer:'bunyan-api',audience:'bunyan-admin'});next()}catch{return res.status(401).json({error:'جلسة غير صالحة أو منتهية'})}}
 const allow=(...roles)=>(req,res,next)=>roles.includes(req.user.role)?next():res.status(403).json({error:'ليست لديك الصلاحية المطلوبة'});
+
+await pool.query(`
+CREATE TABLE IF NOT EXISTS financial_entries(
+  id BIGSERIAL PRIMARY KEY,
+  entry_type VARCHAR(20) NOT NULL CHECK(entry_type IN ('income','expense')),
+  project_id BIGINT NULL,
+  title VARCHAR(200) NOT NULL,
+  category VARCHAR(120),
+  amount NUMERIC(18,2) NOT NULL CHECK(amount>0),
+  currency VARCHAR(3) NOT NULL DEFAULT 'SDG' CHECK(currency IN ('SDG','SAR','USD')),
+  entry_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  reference_number VARCHAR(160),
+  proof_url TEXT,
+  notes TEXT,
+  is_public BOOLEAN NOT NULL DEFAULT TRUE,
+  created_by TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS financial_entries_project_idx ON financial_entries(project_id);
+CREATE INDEX IF NOT EXISTS financial_entries_date_idx ON financial_entries(entry_date DESC);
+CREATE INDEX IF NOT EXISTS financial_entries_public_idx ON financial_entries(is_public);
+`);
 
 app.post('/api/public/help-requests',publicWriteLimit,asyncRoute(async(req,res)=>{
   const d=z.object({fullName:z.string().min(2).max(160),phone:z.string().min(5).max(40),location:z.string().min(2).max(160),caseType:z.string().min(2).max(100),description:z.string().min(10).max(4000),requestedAmount:z.union([z.coerce.number().nonnegative(),z.literal(''),z.null()]).optional(),currency:z.enum(['SDG','SAR','USD']).default('SDG')}).parse(req.body);
@@ -45,7 +66,6 @@ app.post('/api/public/help-requests',publicWriteLimit,asyncRoute(async(req,res)=
 }));
 
 app.get('/api/help/requests',auth,asyncRoute(async(_req,res)=>{const {rows}=await pool.query('SELECT * FROM help_requests ORDER BY created_at DESC LIMIT 500');res.json(rows)}));
-
 app.patch('/api/help/requests/:id',auth,allow('admin','manager','staff'),asyncRoute(async(req,res)=>{
   const d=z.object({status:z.enum(['new','review','approved','rejected','completed']).optional(),adminNotes:z.string().max(4000).optional()}).parse(req.body);
   const sets=[],values=[];
@@ -58,4 +78,54 @@ app.patch('/api/help/requests/:id',auth,allow('admin','manager','staff'),asyncRo
   res.json(rows[0]);
 }));
 
-app.use((err,req,res,_next)=>{console.error('[help-requests]',err);if(res.headersSent)return;if(err instanceof z.ZodError)return res.status(400).json({error:'بيانات غير صالحة',details:err.flatten()});res.status(500).json({error:process.env.NODE_ENV==='production'?'حدث خطأ داخلي':err.message})});
+const financeSchema=z.object({
+  entry_type:z.enum(['income','expense']),
+  project_id:z.union([z.coerce.number().int().positive(),z.null(),z.literal('')]).optional(),
+  title:z.string().min(3).max(200),
+  category:z.string().max(120).nullable().optional(),
+  amount:z.coerce.number().positive(),
+  currency:z.enum(['SDG','SAR','USD']).default('SDG'),
+  entry_date:z.coerce.date(),
+  reference_number:z.string().max(160).nullable().optional(),
+  proof_url:z.union([z.string().url().max(2000),z.literal(''),z.null()]).optional(),
+  notes:z.string().max(3000).nullable().optional(),
+  is_public:z.boolean().default(true)
+});
+
+app.get('/api/finance/entries',auth,asyncRoute(async(_req,res)=>{
+  const {rows}=await pool.query('SELECT * FROM financial_entries ORDER BY entry_date DESC,created_at DESC LIMIT 2000');
+  res.json(rows);
+}));
+
+app.get('/api/public/finance/report',asyncRoute(async(_req,res)=>{
+  const {rows}=await pool.query("SELECT id,entry_type,project_id,title,category,amount,currency,entry_date,reference_number,proof_url,notes,created_at FROM financial_entries WHERE is_public=true ORDER BY entry_date DESC,created_at DESC LIMIT 2000");
+  const totals=rows.reduce((a,x)=>{a[x.entry_type]+=Number(x.amount||0);return a},{income:0,expense:0});
+  res.json({totals:{...totals,balance:totals.income-totals.expense},entries:rows,generated_at:new Date().toISOString()});
+}));
+
+app.post('/api/finance/entries',auth,allow('admin','manager','staff'),asyncRoute(async(req,res)=>{
+  const d=financeSchema.parse(req.body);
+  const projectId=d.project_id===''||d.project_id==null?null:d.project_id;
+  const {rows}=await pool.query(`INSERT INTO financial_entries(entry_type,project_id,title,category,amount,currency,entry_date,reference_number,proof_url,notes,is_public,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,[d.entry_type,projectId,d.title,d.category||null,d.amount,d.currency,d.entry_date,d.reference_number||null,d.proof_url||null,d.notes||null,d.is_public,req.user.email||req.user.sub||null]);
+  res.status(201).json(rows[0]);
+}));
+
+app.patch('/api/finance/entries/:id',auth,allow('admin','manager','staff'),asyncRoute(async(req,res)=>{
+  const d=financeSchema.partial().parse(req.body);
+  const map={entry_type:'entry_type',project_id:'project_id',title:'title',category:'category',amount:'amount',currency:'currency',entry_date:'entry_date',reference_number:'reference_number',proof_url:'proof_url',notes:'notes',is_public:'is_public'};
+  const sets=[],values=[];
+  for(const [key,column] of Object.entries(map)){if(Object.hasOwn(d,key)){let value=d[key];if(key==='project_id'&&(value===''||value==null))value=null;if(['category','reference_number','proof_url','notes'].includes(key)&&value==='')value=null;values.push(value);sets.push(`${column}=$${values.length}`)}}
+  if(!sets.length)return res.status(400).json({error:'لا توجد تغييرات صالحة'});
+  values.push(req.params.id);
+  const {rows}=await pool.query(`UPDATE financial_entries SET ${sets.join(',')},updated_at=now() WHERE id=$${values.length} RETURNING *`,values);
+  if(!rows[0])return res.status(404).json({error:'الحركة المالية غير موجودة'});
+  res.json(rows[0]);
+}));
+
+app.delete('/api/finance/entries/:id',auth,allow('admin','manager'),asyncRoute(async(req,res)=>{
+  const result=await pool.query('DELETE FROM financial_entries WHERE id=$1',[req.params.id]);
+  if(!result.rowCount)return res.status(404).json({error:'الحركة المالية غير موجودة'});
+  res.status(204).end();
+}));
+
+app.use((err,req,res,_next)=>{console.error('[bunyan-bootstrap]',err);if(res.headersSent)return;if(err instanceof z.ZodError)return res.status(400).json({error:'بيانات غير صالحة',details:err.flatten()});res.status(500).json({error:process.env.NODE_ENV==='production'?'حدث خطأ داخلي':err.message})});
