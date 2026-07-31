@@ -1,15 +1,17 @@
 (()=>{
   'use strict';
-  const release='20260731-transparency-v6-1';
+  const release='20260731-news-v7-1';
   const addStyle=(href,key)=>{if(document.querySelector(`link[data-${key}]`))return;const style=document.createElement('link');style.rel='stylesheet';style.href=`./${href}?v=${release}`;style.setAttribute(`data-${key}`,'1');document.head.appendChild(style)};
   const addScript=(src,key,onload)=>{if(document.querySelector(`script[data-${key}]`)){onload?.();return}const script=document.createElement('script');script.src=`./${src}?v=${release}`;script.async=false;script.setAttribute(`data-${key}`,'1');if(onload)script.onload=onload;document.head.appendChild(script)};
   addStyle('project-v4.css','project-v4');
   addStyle('project-lifecycle.css','project-lifecycle');
   addStyle('beneficiaries-v5.css','beneficiaries-v5');
   addStyle('transparency-v6.css','transparency-v6');
+  addStyle('news-v7.css','news-v7');
   addScript('project-v4.js','project-v4',()=>{
     addScript('project-lifecycle.js','project-lifecycle');
     addScript('beneficiaries-v5.js','beneficiaries-v5');
     addScript('transparency-v6.js','transparency-v6');
+    addScript('news-v7.js','news-v7');
   });
 })();
