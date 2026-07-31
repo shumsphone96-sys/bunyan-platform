@@ -4,11 +4,25 @@ import jwt from 'jsonwebtoken';
 import pg from 'pg';
 import { rateLimit } from 'express-rate-limit';
 import { z } from 'zod';
+import { readFile, writeFile } from 'node:fs/promises';
+
+// Keep the strict login limiter, but raise the general API allowance.
+// The frontend loads several live modules, so the old global limit of 400
+// could be exhausted and block a correct administrator login.
+const sourceUrl=new URL('./server-v8.js',import.meta.url);
+const runtimeUrl=new URL('./server-runtime.js',import.meta.url);
+const source=await readFile(sourceUrl,'utf8');
+const patched=source.replace(
+  "app.use('/api/',rateLimit({windowMs:15*60*1000,limit:400,",
+  "app.use('/api/',rateLimit({windowMs:15*60*1000,limit:5000,"
+);
+if(patched===source)throw new Error('Global API rate-limit signature was not found');
+await writeFile(runtimeUrl,patched,'utf8');
 
 let app;
 const originalListen=express.application.listen;
 express.application.listen=function(...args){app=this;return originalListen.apply(this,args)};
-await import('./server-v8.js');
+await import('./server-runtime.js');
 express.application.listen=originalListen;
 
 if(!app)throw new Error('BUNYAN Express application was not captured');
