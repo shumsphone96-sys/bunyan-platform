@@ -1,7 +1,7 @@
 (function(){
   const $=s=>document.querySelector(s);
   const $$=s=>[...document.querySelectorAll(s)];
-  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
   const origins=window.BUNYAN_API_ORIGINS||[window.BUNYAN_API_ORIGIN||'https://api.bunyan-sudan.org','https://bunyan-api-qhkf.onrender.com'];
   let origin=sessionStorage.getItem('bunyan_api_origin')||origins[0];
   const token=()=>sessionStorage.getItem('bunyan_token')||'';
@@ -59,8 +59,8 @@
   async function removeItem(type,id){if(!confirm('هل تريد حذف هذا السجل نهائياً؟'))return;try{await api(`/api/${type}/${id}`,{method:'DELETE'});renderManager(type)}catch(e){alert(e.message)}}
 
   function installQuickAction(){
-    const content=$('#dashContent');
-    if(!content||$('#quickNewProject'))return;
+    const content=$('#dashContent'),title=$('#dashTitle');
+    if(!content||!title||title.textContent.trim()!=='إدارة المشروعات'||$('#quickNewProject'))return;
     const bar=document.createElement('div');
     bar.className='global-quick-actions';
     bar.innerHTML='<button id="quickNewProject" class="primary">+ إنشاء مشروع جديد</button><button id="quickManageProjects" class="pro-btn">إدارة المشروعات</button>';
@@ -69,11 +69,23 @@
     $('#quickManageProjects').onclick=()=>renderManager('projects');
   }
 
-  const timer=setInterval(()=>{
+  setInterval(()=>{
     const dash=$('#dash');if(!dash)return;
     const p=$('[data-view="projects"]'),n=$('[data-view="news"]');
     if(p)p.onclick=()=>renderManager('projects');
     if(n)n.onclick=()=>renderManager('news');
+    document.querySelectorAll('.global-quick-actions').forEach(el=>{if($('#dashTitle')?.textContent.trim()!=='إدارة المشروعات')el.remove()});
     if(dash.classList.contains('open'))installQuickAction();
   },400);
+})();
+
+(()=>{
+  'use strict';
+  const VERSION='20260731-executive-direct-v9-4';
+  function loadStyle(){if(document.querySelector('[data-executive-direct-style]'))return;const l=document.createElement('link');l.rel='stylesheet';l.href=`./executive-dashboard-v9.css?v=${VERSION}`;l.dataset.executiveDirectStyle='1';document.head.appendChild(l)}
+  function loadScript(){if(window.openExecutiveDashboard){window.openExecutiveDashboard();return}if(document.querySelector('[data-executive-direct-script]'))return;const s=document.createElement('script');s.src=`./executive-dashboard-v9.js?v=${VERSION}`;s.async=false;s.dataset.executiveDirectScript='1';s.onload=()=>window.openExecutiveDashboard?.();document.body.appendChild(s)}
+  function open(){loadStyle();loadScript();document.querySelectorAll('.global-quick-actions').forEach(el=>el.remove())}
+  function bind(){const btn=document.querySelector('[data-view="home"],[data-view="overview"]');if(btn&&!btn.dataset.executiveBound){btn.dataset.executiveBound='1';btn.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();open()},true)}const dash=document.querySelector('#dash');if(dash?.classList.contains('open')&&document.querySelector('#dashTitle')?.textContent.trim()==='نظرة عامة')open()}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});else bind();
+  setInterval(bind,300);
 })();
