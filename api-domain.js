@@ -3,7 +3,7 @@
 
   const official='https://api.bunyan-sudan.org';
   const render='https://bunyan-api-qhkf.onrender.com';
-  const release='20260730-menu-final-1';
+  const release='20260731-executive-force-v9-4';
 
   window.BUNYAN_API_ORIGINS=[official,render];
   window.BUNYAN_API_ORIGIN=official;
@@ -34,7 +34,8 @@
   };
 
   const loadScript=(file,key)=>new Promise(resolve=>{
-    if(document.querySelector(`script[data-bunyan-module="${key}"]`)){resolve();return;}
+    const old=document.querySelector(`script[data-bunyan-module="${key}"]`);
+    if(old)old.remove();
     const script=document.createElement('script');
     script.src=`./${file}?v=${release}`;script.async=false;script.dataset.bunyanModule=key;
     script.onload=resolve;script.onerror=()=>{console.warn(`Optional script failed: ${file}`);resolve();};
@@ -42,7 +43,7 @@
   });
 
   [
-    ['project-center.css','project-center-style'],['financial-center.css','financial-center-style'],['global-suite.css','global-suite-style'],['project-transparency.css','project-transparency-style'],['completion-suite.css','completion-suite-style'],['project-operations.css','project-operations-style'],['copy-link.css','copy-link-style'],['mobile-admin-fix.css','mobile-admin-fix-style'],['i18n-global.css','i18n-global-style'],['impact-upgrade.css','impact-upgrade-style'],['public-project-page.css','public-project-page-style'],['project-map.css','project-map-style'],['mobile-public-menu.css','mobile-public-menu-style'],['language-selector.css','language-selector-style'],['admin-access-fix.css','admin-access-fix-style'],['menu-final-fix.css','menu-final-fix-style']
+    ['project-center.css','project-center-style'],['financial-center.css','financial-center-style'],['global-suite.css','global-suite-style'],['project-transparency.css','project-transparency-style'],['completion-suite.css','completion-suite-style'],['project-operations.css','project-operations-style'],['copy-link.css','copy-link-style'],['mobile-admin-fix.css','mobile-admin-fix-style'],['i18n-global.css','i18n-global-style'],['impact-upgrade.css','impact-upgrade-style'],['public-project-page.css','public-project-page-style'],['project-map.css','project-map-style'],['mobile-public-menu.css','mobile-public-menu-style'],['language-selector.css','language-selector-style'],['admin-access-fix.css','admin-access-fix-style'],['menu-final-fix.css','menu-final-fix-style'],['executive-dashboard-v9.css','executive-dashboard-v9-force-style']
   ].forEach(([file,key])=>loadStyle(file,key));
 
   const modules=[
@@ -61,7 +62,13 @@
     window.BunyanI18n?.refresh?.();
     window.BunyanPublicLocale?.render?.();
     await loadScript('menu-final-fix.js','menu-final-fix-last');
+    await loadScript('executive-dashboard-v9.js','executive-dashboard-v9-force-last');
     reveal();
     window.dispatchEvent(new CustomEvent('bunyan:ready',{detail:{release}}));
+    setTimeout(()=>{
+      const dash=document.getElementById('dash');
+      const title=document.getElementById('dashTitle');
+      if(dash?.classList.contains('open')&&title?.textContent?.trim()==='نظرة عامة')window.openExecutiveDashboard?.();
+    },900);
   })().catch(error=>{console.error('BUNYAN bootstrap failed:',error);reveal();});
 })();
