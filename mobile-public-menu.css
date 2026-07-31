@@ -1,20 +1,20 @@
 @media (max-width:900px){
-  body>header{height:78px;padding:0 20px;position:sticky;top:0;z-index:100;overflow:visible}
-  #menu{display:grid!important;place-items:center;width:46px;height:46px;border:1px solid #d7aa4b66;border-radius:12px;background:#fff;color:#071a17;font-size:0;line-height:1;position:relative;z-index:103;cursor:pointer}
-  #menu::before{content:'☰';font-size:25px;color:#071a17}
-  #menu[aria-expanded='true']::before{content:'×';font-size:34px;color:#071a17}
-  #nav{display:flex!important;position:absolute!important;top:calc(100% + 8px)!important;bottom:auto!important;left:20px!important;right:auto!important;width:min(285px,calc(100vw - 40px))!important;height:auto!important;max-height:calc(100vh - 110px)!important;padding:10px!important;background:#fff!important;border:1px solid #dfe5e1!important;border-radius:16px!important;box-shadow:0 18px 55px rgba(7,26,23,.22)!important;flex-direction:column!important;align-items:stretch!important;justify-content:flex-start!important;gap:3px!important;overflow-y:auto!important;transform:translateY(-8px) scale(.98)!important;transform-origin:top left!important;opacity:0;visibility:hidden;pointer-events:none;transition:transform .18s ease,opacity .18s ease,visibility .18s ease;z-index:102}
+  body>header{height:78px!important;padding:0 20px!important;position:sticky!important;top:0!important;z-index:100!important;overflow:visible!important}
+  #menu{display:grid!important;place-items:center!important;width:44px!important;height:44px!important;border:1px solid #d7aa4b88!important;border-radius:12px!important;background:#fff!important;color:#071a17!important;font-size:0!important;line-height:1!important;position:relative!important;z-index:103!important;cursor:pointer!important;padding:0!important}
+  #menu::before{content:'☰'!important;font-size:23px!important;color:#071a17!important}
+  #menu[aria-expanded='true']::before{content:'×'!important;font-size:31px!important;color:#071a17!important}
+  #nav{display:flex!important;position:absolute!important;top:70px!important;left:20px!important;right:auto!important;bottom:auto!important;width:220px!important;min-width:220px!important;max-width:220px!important;height:auto!important;max-height:none!important;padding:7px!important;margin:0!important;background:#fff!important;border:1px solid #dfe5e1!important;border-radius:14px!important;box-shadow:0 14px 38px rgba(7,26,23,.18)!important;flex-direction:column!important;align-items:stretch!important;justify-content:flex-start!important;gap:1px!important;overflow:visible!important;transform:translateY(-6px) scale(.98)!important;transform-origin:top left!important;opacity:0!important;visibility:hidden!important;pointer-events:none!important;transition:transform .16s ease,opacity .16s ease,visibility .16s ease!important;z-index:102!important}
   html[dir='ltr'] #nav{left:auto!important;right:20px!important;transform-origin:top right!important}
-  #nav.open{transform:translateY(0) scale(1)!important;opacity:1;visibility:visible;pointer-events:auto}
-  #nav>a,#nav>button{width:100%;min-height:42px;display:flex;align-items:center;justify-content:flex-start;padding:10px 13px!important;border-radius:10px!important;font-size:15px!important;text-align:start!important;color:#12231f!important;background:transparent!important;border:0!important;font-weight:500!important}
-  #nav>a:hover,#nav>a:focus-visible,#nav>button:hover,#nav>button:focus-visible{background:#f3f6f5!important;outline:none}
-  #nav .language-selector{display:grid!important;grid-template-columns:1fr 1fr!important;width:100%!important;margin:6px 0!important;border:1px solid #dfe5e1!important;border-radius:11px!important;overflow:hidden!important;background:#fff!important}
-  #nav .language-selector a{display:block!important;width:auto!important;min-height:auto!important;padding:10px 8px!important;text-align:center!important;font-size:14px!important;color:#12231f!important;background:#fff!important;border-radius:0!important}
+  #nav.open{transform:translateY(0) scale(1)!important;opacity:1!important;visibility:visible!important;pointer-events:auto!important}
+  #nav>a,#nav>button{width:100%!important;min-height:34px!important;height:34px!important;display:flex!important;align-items:center!important;justify-content:flex-start!important;padding:6px 10px!important;margin:0!important;border-radius:8px!important;font-size:13px!important;line-height:1.2!important;text-align:start!important;color:#12231f!important;background:transparent!important;border:0!important;font-weight:500!important;white-space:nowrap!important}
+  #nav>a:hover,#nav>a:focus-visible,#nav>button:hover,#nav>button:focus-visible{background:#f3f6f5!important;outline:none!important}
+  #nav .language-selector{display:grid!important;grid-template-columns:1fr 1fr!important;width:100%!important;margin:4px 0!important;border:1px solid #dfe5e1!important;border-radius:9px!important;overflow:hidden!important;background:#fff!important}
+  #nav .language-selector a{display:flex!important;align-items:center!important;justify-content:center!important;width:auto!important;min-height:32px!important;height:32px!important;padding:5px 4px!important;margin:0!important;text-align:center!important;font-size:12px!important;line-height:1!important;color:#12231f!important;background:#fff!important;border-radius:0!important;white-space:nowrap!important}
   #nav .language-selector a+a{border-inline-start:1px solid #dfe5e1!important}
   #nav .language-selector a.active,#nav .language-selector a[aria-current='true']{background:#f5f2e9!important;color:#7b5a18!important;font-weight:700!important}
-  #nav #adminBtn{margin-top:3px!important;background:linear-gradient(135deg,#d7aa4b,#f0d084)!important;color:#211604!important;justify-content:center!important;font-weight:800!important}
+  #nav #adminBtn{height:36px!important;min-height:36px!important;margin-top:3px!important;padding:6px 10px!important;background:linear-gradient(135deg,#d7aa4b,#f0d084)!important;color:#211604!important;justify-content:center!important;font-size:13px!important;font-weight:800!important}
   #nav::after,body.menu-open::before{display:none!important}
   body.menu-open{overflow:auto!important}
-  .brand{position:relative;z-index:103}
+  .brand{position:relative!important;z-index:103!important}
 }
-@media (min-width:901px){body.menu-open{overflow:auto}}
+@media (min-width:901px){body.menu-open{overflow:auto!important}}
