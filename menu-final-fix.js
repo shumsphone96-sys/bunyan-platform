@@ -21,15 +21,29 @@
   document.documentElement.dir=lang==='ar'?'rtl':'ltr';
   localStorage.setItem('bunyan_language',lang);
 
+  const normalize=v=>String(v||'').trim().replace(/\s+/g,' ');
+  const textKey={
+    'من نحن':'about','About Us':'about',
+    'البرامج':'programs','Programs':'programs',
+    'المشروعات':'projects','Projects':'projects',
+    'الأخبار':'news','News':'news',
+    'شارك معنا':'join','Join Us':'join',
+    'اتصل بنا':'contact','Contact Us':'contact',
+    'الأثر':'impact','Impact':'impact',
+    'الشفافية':'transparency','Transparency':'transparency'
+  };
+  const hrefKey={about:'about',programs:'programs',projects:'projects',news:'news',join:'join',contact:'contact',impact:'impact',transparency:'transparency'};
+
   const applyLabels=()=>{
-    const map=[
-      ['#about',labels.about],['#programs',labels.programs],['#projects',labels.projects],
-      ['#news',labels.news],['#join',labels.join],['#contact',labels.contact],
-      ['#impact',labels.impact],['#transparency',labels.transparency]
-    ];
-    nav.querySelectorAll('a').forEach(a=>{
-      const href=a.getAttribute('href')||'';
-      for(const [fragment,text] of map){if(href===fragment||href.endsWith(fragment)){a.textContent=text;break;}}
+    nav.querySelectorAll('a:not([data-lang-link])').forEach(a=>{
+      const href=String(a.getAttribute('href')||'').toLowerCase();
+      let key=textKey[normalize(a.textContent)];
+      if(!key){
+        for(const [fragment,name] of Object.entries(hrefKey)){
+          if(href.includes('#'+fragment)||href.includes('/'+fragment)){key=name;break;}
+        }
+      }
+      if(key&&labels[key])a.textContent=labels[key];
     });
     const admin=document.getElementById('adminBtn');if(admin)admin.textContent=labels.admin;
     const brand=document.querySelector('body>header .brand strong');if(brand)brand.textContent=labels.brand;
@@ -44,8 +58,13 @@
   };
 
   applyLabels();
-  [50,200,600,1200].forEach(ms=>setTimeout(applyLabels,ms));
-  const observer=new MutationObserver(()=>applyLabels());
+  [50,150,350,700,1200,2000].forEach(ms=>setTimeout(applyLabels,ms));
+  let applying=false;
+  const observer=new MutationObserver(()=>{
+    if(applying)return;
+    applying=true;
+    requestAnimationFrame(()=>{applyLabels();applying=false;});
+  });
   observer.observe(nav,{subtree:true,childList:true,characterData:true});
 
   nav.querySelectorAll('[data-lang-link]').forEach(a=>a.addEventListener('click',()=>sessionStorage.setItem('bunyan_menu_reopen','1')));
@@ -57,9 +76,7 @@
   };
   menu.setAttribute('aria-controls','nav');
   menu.setAttribute('aria-expanded','false');
-  menu.addEventListener('click',e=>{
-    e.preventDefault();e.stopImmediatePropagation();setOpen(!nav.classList.contains('open'));
-  },true);
+  menu.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();setOpen(!nav.classList.contains('open'));},true);
   nav.addEventListener('click',e=>{if(e.target.closest('a:not([data-lang-link]),#adminBtn'))setOpen(false);},true);
   document.addEventListener('click',e=>{if(nav.classList.contains('open')&&!nav.contains(e.target)&&!menu.contains(e.target))setOpen(false);});
   document.addEventListener('keydown',e=>{if(e.key==='Escape')setOpen(false);});
