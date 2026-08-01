@@ -6,15 +6,20 @@ import { rateLimit } from 'express-rate-limit';
 import { z } from 'zod';
 import { readFile, writeFile } from 'node:fs/promises';
 
-// Keep the strict login limiter, but raise the general API allowance.
+// Keep the strict login limiter. The broad API limiter must not consume the
+// allowance of public forms; those routes have their own anti-spam limiter.
 const sourceUrl=new URL('./server-v8.js',import.meta.url);
 const runtimeUrl=new URL('./server-runtime.js',import.meta.url);
 const source=await readFile(sourceUrl,'utf8');
-const patched=source.replace(
-  "app.use('/api/',rateLimit({windowMs:15*60*1000,limit:400,",
-  "app.use('/api/',rateLimit({windowMs:15*60*1000,limit:5000,"
+let patched=source.replace(
+  "app.use('/api/',rateLimit({windowMs:15*60*1000,limit:400,standardHeaders:'draft-7',legacyHeaders:false,message:{error:'طلبات كثيرة. حاول لاحقاً.'}}));",
+  "app.use('/api/',rateLimit({windowMs:15*60*1000,limit:5000,skip:req=>req.path.startsWith('/public/'),standardHeaders:'draft-7',legacyHeaders:false,message:{error:'طلبات كثيرة. حاول لاحقاً.'}}));"
 );
-if(patched===source)throw new Error('Global API rate-limit signature was not found');
+patched=patched.replace(
+  "const publicWriteLimit=rateLimit({windowMs:60*60*1000,limit:30,standardHeaders:'draft-7',legacyHeaders:false,message:{error:'تم تجاوز الحد المسموح مؤقتاً.'}});",
+  "const publicWriteLimit=rateLimit({windowMs:60*60*1000,limit:100,standardHeaders:'draft-7',legacyHeaders:false,message:{error:'تم تجاوز الحد المسموح مؤقتاً. حاول بعد قليل.'}});"
+);
+if(patched===source)throw new Error('Rate-limit signatures were not found');
 await writeFile(runtimeUrl,patched,'utf8');
 
 let app;
@@ -28,7 +33,7 @@ const {Pool}=pg;
 const pool=new Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.NODE_ENV==='production'?{rejectUnauthorized:false}:false});
 const secret=process.env.JWT_SECRET;
 if(!secret)throw new Error('JWT_SECRET is required');
-const publicWriteLimit=rateLimit({windowMs:60*60*1000,limit:30,standardHeaders:'draft-7',legacyHeaders:false,message:{error:'تم تجاوز الحد المسموح مؤقتاً.'}});
+const publicWriteLimit=rateLimit({windowMs:60*60*1000,limit:100,standardHeaders:'draft-7',legacyHeaders:false,message:{error:'تم تجاوز الحد المسموح مؤقتاً. حاول بعد قليل.'}});
 const asyncRoute=fn=>(req,res,next)=>Promise.resolve(fn(req,res,next)).catch(next);
 function auth(req,res,next){const token=req.headers.authorization?.replace(/^Bearer\s+/i,'');if(!token)return res.status(401).json({error:'يلزم تسجيل الدخول'});try{req.user=jwt.verify(token,secret,{issuer:'bunyan-api',audience:'bunyan-admin'});next()}catch{return res.status(401).json({error:'جلسة غير صالحة أو منتهية'})}}
 const allow=(...roles)=>(req,res,next)=>roles.includes(req.user.role)?next():res.status(403).json({error:'ليست لديك الصلاحية المطلوبة'});
