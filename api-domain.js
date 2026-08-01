@@ -3,22 +3,29 @@
 
   const official='https://api.bunyan-sudan.org';
   const render='https://bunyan-api-qhkf.onrender.com';
-  const release='20260801-admin-drawer-final-3';
+  const release='20260801-visible-failsafe-4';
 
   window.BUNYAN_API_ORIGINS=[official,render];
   window.BUNYAN_API_ORIGIN=official;
   window.BUNYAN_RELEASE=release;
 
-  document.documentElement.classList.add('bunyan-loading');
   const reveal=()=>{
     document.documentElement.classList.remove('bunyan-loading');
     document.documentElement.classList.add('bunyan-ready');
-    if(document.body){document.body.style.visibility='visible';document.body.style.opacity='1';}
+    document.documentElement.style.visibility='visible';
+    document.documentElement.style.opacity='1';
+    if(document.body){
+      document.body.style.display='block';
+      document.body.style.visibility='visible';
+      document.body.style.opacity='1';
+    }
   };
-
+  reveal();
+  document.addEventListener('DOMContentLoaded',reveal,{once:true});
+  window.addEventListener('load',reveal,{once:true});
   window.addEventListener('error',event=>{console.error('BUNYAN frontend error:',event.error||event.message);reveal();});
   window.addEventListener('unhandledrejection',event=>{console.error('BUNYAN rejected promise:',event.reason);reveal();});
-  setTimeout(reveal,2500);
+  setInterval(reveal,1500);
 
   if('serviceWorker' in navigator){
     navigator.serviceWorker.getRegistrations().then(registrations=>Promise.all(registrations.map(r=>r.unregister()))).catch(()=>{});
@@ -57,7 +64,10 @@
   ];
 
   (async()=>{
-    for(const [file,key] of modules)await loadScript(file,key);
+    for(const [file,key] of modules){
+      await loadScript(file,key);
+      reveal();
+    }
     window.BunyanI18nBindings?.bind?.();
     window.BunyanI18n?.refresh?.();
     window.BunyanPublicLocale?.render?.();
@@ -74,6 +84,7 @@
       if(dash?.classList.contains('open')&&title?.textContent?.trim()==='نظرة عامة')window.openExecutiveDashboard?.();
       window.BunyanAdminEntryFinal?.install?.();
       window.BunyanStability?.run?.();
+      reveal();
     },900);
   })().catch(error=>{console.error('BUNYAN bootstrap failed:',error);reveal();});
 })();
