@@ -1,0 +1,45 @@
+name: Admin V2 Quality Gate
+
+on:
+  push:
+    branches: [rebuild-v2]
+    paths:
+      - 'admin-v2/**'
+      - 'scripts/verify-admin-v2.mjs'
+      - '.github/workflows/admin-v2-quality.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'admin-v2/**'
+      - 'scripts/verify-admin-v2.mjs'
+      - '.github/workflows/admin-v2-quality.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check JavaScript syntax
+        run: node --check admin-v2/app.js
+
+      - name: Verify Admin V2 contract and API protection
+        run: node scripts/verify-admin-v2.mjs
+
+      - name: Package isolated preview artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bunyan-admin-v2-preview
+          path: admin-v2/
+          if-no-files-found: error
+          retention-days: 14
