@@ -7,6 +7,7 @@
   <title>بُنْيَان OS — الإدارة V2</title>
   <link rel="stylesheet" href="./styles.css">
   <link rel="stylesheet" href="./runtime.css">
+  <link rel="stylesheet" href="./help.css">
 </head>
 <body>
   <section id="loginView" class="auth-view">
@@ -20,7 +21,6 @@
       <p id="loginMessage" class="message" role="status">جاري إيقاظ الخادم الآمن…</p>
     </form>
   </section>
-
   <section id="appView" class="app" hidden>
     <aside id="sidebar" class="sidebar" aria-label="قائمة الإدارة">
       <div class="sidebar-head"><div class="brand-mark small">ب</div><div><strong>بُنْيَان OS</strong><small>الإدارة V2</small></div></div>
@@ -28,43 +28,15 @@
         <button data-view="dashboard" class="active">نظرة عامة</button>
         <button data-view="help">طلبات المساعدة <span id="helpBadge" class="badge">0</span></button>
         <button data-view="participation">طلبات المشاركة <span id="participationBadge" class="badge">0</span></button>
-        <button data-view="donations">التبرعات</button>
-        <button data-view="projects">المشروعات</button>
-        <button data-view="beneficiaries">المستفيدون</button>
-        <button data-view="volunteers">المتطوعون</button>
-        <button data-view="news">الأخبار</button>
+        <button data-view="donations">التبرعات</button><button data-view="projects">المشروعات</button><button data-view="beneficiaries">المستفيدون</button><button data-view="volunteers">المتطوعون</button><button data-view="news">الأخبار</button>
       </nav>
-      <div class="sidebar-foot">
-        <a href="../" class="ghost">عرض الموقع</a>
-        <button id="logoutButton" class="danger">تسجيل الخروج</button>
-      </div>
+      <div class="sidebar-foot"><a href="../" class="ghost">عرض الموقع</a><button id="logoutButton" class="danger">تسجيل الخروج</button></div>
     </aside>
-
-    <main class="main">
-      <header class="topbar">
-        <button id="menuButton" class="menu-button" aria-label="فتح قائمة الإدارة">☰</button>
-        <div><p class="eyebrow">لوحة الإدارة المستقلة</p><h2 id="pageTitle">نظرة عامة</h2></div>
-        <button id="refreshButton" class="ghost">تحديث</button>
-      </header>
-      <div id="content" class="content" aria-live="polite"></div>
-    </main>
+    <main class="main"><header class="topbar"><button id="menuButton" class="menu-button" aria-label="فتح قائمة الإدارة">☰</button><div><p class="eyebrow">لوحة الإدارة المستقلة</p><h2 id="pageTitle">نظرة عامة</h2></div><button id="refreshButton" class="ghost">تحديث</button></header><div id="content" class="content" aria-live="polite"></div></main>
     <button id="backdrop" class="backdrop" aria-label="إغلاق القائمة" hidden></button>
   </section>
-
-  <script>
-    (() => {
-      const form = document.getElementById('loginForm');
-      const button = form.querySelector('button[type="submit"]');
-      const message = document.getElementById('loginMessage');
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 90000);
-      fetch('https://api.bunyan-sudan.org/health', {cache:'no-store',signal:controller.signal})
-        .then(response => {if(!response.ok) throw new Error('health'); return response.json();})
-        .then(data => {if(!data?.ok) throw new Error('health'); message.textContent='الخادم جاهز. يمكنك تسجيل الدخول الآن.';})
-        .catch(() => {message.textContent='لم نتأكد من جاهزية الخادم، لكن يمكنك المحاولة الآن.';})
-        .finally(() => {clearTimeout(timer);button.disabled=false;button.textContent='دخول';});
-    })();
-  </script>
+  <script>(()=>{const form=document.getElementById('loginForm'),button=form.querySelector('button[type="submit"]'),message=document.getElementById('loginMessage'),controller=new AbortController(),timer=setTimeout(()=>controller.abort(),90000);fetch('https://api.bunyan-sudan.org/health',{cache:'no-store',signal:controller.signal}).then(r=>{if(!r.ok)throw new Error('health');return r.json()}).then(data=>{if(!data?.ok)throw new Error('health');message.textContent='الخادم جاهز. يمكنك تسجيل الدخول الآن.'}).catch(()=>{message.textContent='لم نتأكد من جاهزية الخادم، لكن يمكنك المحاولة الآن.'}).finally(()=>{clearTimeout(timer);button.disabled=false;button.textContent='دخول'})})();</script>
   <script type="module" src="./app.js"></script>
+  <script type="module" src="./help.js"></script>
 </body>
 </html>
