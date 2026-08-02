@@ -6,7 +6,8 @@
   <meta name="theme-color" content="#071a17">
   <meta name="robots" content="noindex,nofollow">
   <title>بُنْيَان OS — اختبار الإدارة V2</title>
-  <link rel="stylesheet" href="./styles.css?v=20260802-3">
+  <link rel="stylesheet" href="./styles.css?v=20260802-4">
+  <link rel="stylesheet" href="./help.css?v=20260802-4">
 </head>
 <body>
   <div class="preview-banner">اختبار الإدارة V2 — نسخة معزولة عن النظام القديم</div>
@@ -43,35 +44,9 @@
     <button id="backdrop" class="backdrop" aria-label="إغلاق القائمة" hidden></button>
   </section>
   <script>
-    (() => {
-      const form = document.getElementById('loginForm');
-      const button = form.querySelector('button[type="submit"]');
-      const message = document.getElementById('loginMessage');
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 90000);
-
-      fetch('https://api.bunyan-sudan.org/health', {
-        cache: 'no-store',
-        signal: controller.signal
-      })
-        .then(response => {
-          if (!response.ok) throw new Error('health');
-          return response.json();
-        })
-        .then(data => {
-          if (!data || data.ok !== true) throw new Error('health');
-          message.textContent = 'الخادم جاهز. يمكنك تسجيل الدخول الآن.';
-        })
-        .catch(() => {
-          message.textContent = 'لم نتأكد من جاهزية الخادم، لكن يمكنك المحاولة الآن.';
-        })
-        .finally(() => {
-          clearTimeout(timer);
-          button.disabled = false;
-          button.textContent = 'دخول';
-        });
-    })();
+    (()=>{const form=document.getElementById('loginForm'),button=form.querySelector('button[type="submit"]'),message=document.getElementById('loginMessage'),controller=new AbortController(),timer=setTimeout(()=>controller.abort(),90000);fetch('https://api.bunyan-sudan.org/health',{cache:'no-store',signal:controller.signal}).then(r=>{if(!r.ok)throw new Error('health');return r.json()}).then(data=>{if(!data||data.ok!==true)throw new Error('health');message.textContent='الخادم جاهز. يمكنك تسجيل الدخول الآن.'}).catch(()=>{message.textContent='لم نتأكد من جاهزية الخادم، لكن يمكنك المحاولة الآن.'}).finally(()=>{clearTimeout(timer);button.disabled=false;button.textContent='دخول'})})();
   </script>
-  <script type="module" src="./app.js?v=20260802-3"></script>
+  <script type="module" src="./app.js?v=20260802-4"></script>
+  <script type="module" src="./help.js?v=20260802-4"></script>
 </body>
 </html>
