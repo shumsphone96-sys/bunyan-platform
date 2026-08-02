@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#071a17">
   <title>بُنْيَان OS — الإدارة V2</title>
   <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./runtime.css">
 </head>
 <body>
   <section id="loginView" class="auth-view">
@@ -15,8 +16,8 @@
       <h1>دخول الإدارة</h1>
       <label>البريد الإلكتروني<input name="email" type="email" autocomplete="username" required></label>
       <label>كلمة المرور<input name="password" type="password" autocomplete="current-password" minlength="10" required></label>
-      <button class="primary" type="submit">دخول</button>
-      <p id="loginMessage" class="message" role="status"></p>
+      <button class="primary" type="submit" disabled>انتظر تجهيز الخادم…</button>
+      <p id="loginMessage" class="message" role="status">جاري إيقاظ الخادم الآمن…</p>
     </form>
   </section>
 
@@ -50,6 +51,20 @@
     <button id="backdrop" class="backdrop" aria-label="إغلاق القائمة" hidden></button>
   </section>
 
+  <script>
+    (() => {
+      const form = document.getElementById('loginForm');
+      const button = form.querySelector('button[type="submit"]');
+      const message = document.getElementById('loginMessage');
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 90000);
+      fetch('https://api.bunyan-sudan.org/health', {cache:'no-store',signal:controller.signal})
+        .then(response => {if(!response.ok) throw new Error('health'); return response.json();})
+        .then(data => {if(!data?.ok) throw new Error('health'); message.textContent='الخادم جاهز. يمكنك تسجيل الدخول الآن.';})
+        .catch(() => {message.textContent='لم نتأكد من جاهزية الخادم، لكن يمكنك المحاولة الآن.';})
+        .finally(() => {clearTimeout(timer);button.disabled=false;button.textContent='دخول';});
+    })();
+  </script>
   <script type="module" src="./app.js"></script>
 </body>
 </html>
