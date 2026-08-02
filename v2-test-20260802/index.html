@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#071a17">
   <meta name="robots" content="noindex,nofollow">
   <title>بُنْيَان OS — اختبار الإدارة V2</title>
-  <link rel="stylesheet" href="./styles.css?v=20260802-2">
+  <link rel="stylesheet" href="./styles.css?v=20260802-3">
 </head>
 <body>
   <div class="preview-banner">اختبار الإدارة V2 — نسخة معزولة عن النظام القديم</div>
@@ -17,8 +17,8 @@
       <h1>دخول الإدارة الجديدة</h1>
       <label>البريد الإلكتروني<input name="email" type="email" autocomplete="username" required></label>
       <label>كلمة المرور<input name="password" type="password" autocomplete="current-password" minlength="10" required></label>
-      <button class="primary" type="submit">دخول</button>
-      <p id="loginMessage" class="message" role="status"></p>
+      <button class="primary" type="submit" disabled>انتظر تجهيز الخادم…</button>
+      <p id="loginMessage" class="message" role="status">جاري إيقاظ الخادم الآمن… قد يستغرق نحو دقيقة في الخطة المجانية.</p>
     </form>
   </section>
   <section id="appView" class="app" hidden>
@@ -42,6 +42,36 @@
     </main>
     <button id="backdrop" class="backdrop" aria-label="إغلاق القائمة" hidden></button>
   </section>
-  <script type="module" src="./app.js?v=20260802-2"></script>
+  <script>
+    (() => {
+      const form = document.getElementById('loginForm');
+      const button = form.querySelector('button[type="submit"]');
+      const message = document.getElementById('loginMessage');
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 90000);
+
+      fetch('https://api.bunyan-sudan.org/health', {
+        cache: 'no-store',
+        signal: controller.signal
+      })
+        .then(response => {
+          if (!response.ok) throw new Error('health');
+          return response.json();
+        })
+        .then(data => {
+          if (!data || data.ok !== true) throw new Error('health');
+          message.textContent = 'الخادم جاهز. يمكنك تسجيل الدخول الآن.';
+        })
+        .catch(() => {
+          message.textContent = 'لم نتأكد من جاهزية الخادم، لكن يمكنك المحاولة الآن.';
+        })
+        .finally(() => {
+          clearTimeout(timer);
+          button.disabled = false;
+          button.textContent = 'دخول';
+        });
+    })();
+  </script>
+  <script type="module" src="./app.js?v=20260802-3"></script>
 </body>
 </html>
