@@ -6,11 +6,12 @@
   <meta name="theme-color" content="#071a17">
   <meta name="robots" content="noindex,nofollow">
   <title>بُنْيَان OS — اختبار الإدارة V2</title>
-  <link rel="stylesheet" href="./styles.css?v=20260803-4">
-  <link rel="stylesheet" href="./help.css?v=20260803-4">
-  <link rel="stylesheet" href="./donations.css?v=20260803-4">
-  <link rel="stylesheet" href="./projects.css?v=20260803-4">
-  <link rel="stylesheet" href="./beneficiaries.css?v=20260803-4">
+  <link rel="stylesheet" href="./styles.css?v=20260803-5">
+  <link rel="stylesheet" href="./help.css?v=20260803-5">
+  <link rel="stylesheet" href="./donations.css?v=20260803-5">
+  <link rel="stylesheet" href="./projects.css?v=20260803-5">
+  <link rel="stylesheet" href="./beneficiaries.css?v=20260803-5">
+  <link rel="stylesheet" href="./volunteers.css?v=20260803-5">
 </head>
 <body>
   <div class="preview-banner">اختبار الإدارة V2 — نسخة معزولة عن النظام القديم</div>
@@ -38,11 +39,12 @@
     <button id="backdrop" class="backdrop" aria-label="إغلاق القائمة" hidden></button>
   </section>
   <script>(()=>{const form=document.getElementById('loginForm'),button=form.querySelector('button[type="submit"]'),message=document.getElementById('loginMessage'),controller=new AbortController(),timer=setTimeout(()=>controller.abort(),90000);fetch('https://api.bunyan-sudan.org/health',{cache:'no-store',signal:controller.signal}).then(r=>{if(!r.ok)throw new Error('health');return r.json()}).then(data=>{if(!data||data.ok!==true)throw new Error('health');message.textContent='الخادم جاهز. يمكنك تسجيل الدخول الآن.'}).catch(()=>{message.textContent='لم نتأكد من جاهزية الخادم، لكن يمكنك المحاولة الآن.'}).finally(()=>{clearTimeout(timer);button.disabled=false;button.textContent='دخول'})})();</script>
-  <script type="module" src="./app.js?v=20260803-4"></script>
-  <script type="module" src="./help.js?v=20260803-4"></script>
-  <script type="module" src="./participation.js?v=20260803-4"></script>
-  <script type="module" src="./donations.js?v=20260803-4"></script>
-  <script type="module" src="./projects.js?v=20260803-4"></script>
-  <script type="module" src="./beneficiaries.js?v=20260803-4"></script>
+  <script type="module" src="./app.js?v=20260803-5"></script>
+  <script type="module" src="./help.js?v=20260803-5"></script>
+  <script type="module" src="./participation.js?v=20260803-5"></script>
+  <script type="module" src="./donations.js?v=20260803-5"></script>
+  <script type="module" src="./projects.js?v=20260803-5"></script>
+  <script type="module" src="./beneficiaries.js?v=20260803-5"></script>
+  <script type="module" src="./volunteers.js?v=20260803-5"></script>
 </body>
 </html>
