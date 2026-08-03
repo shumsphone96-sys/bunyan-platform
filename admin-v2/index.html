@@ -38,5 +38,6 @@
   <script>(()=>{const form=document.getElementById('loginForm'),button=form.querySelector('button[type="submit"]'),message=document.getElementById('loginMessage'),controller=new AbortController(),timer=setTimeout(()=>controller.abort(),90000);fetch('https://api.bunyan-sudan.org/health',{cache:'no-store',signal:controller.signal}).then(r=>{if(!r.ok)throw new Error('health');return r.json()}).then(data=>{if(!data?.ok)throw new Error('health');message.textContent='الخادم جاهز. يمكنك تسجيل الدخول الآن.'}).catch(()=>{message.textContent='لم نتأكد من جاهزية الخادم، لكن يمكنك المحاولة الآن.'}).finally(()=>{clearTimeout(timer);button.disabled=false;button.textContent='دخول'})})();</script>
   <script type="module" src="./app.js"></script>
   <script type="module" src="./help.js"></script>
+  <script type="module" src="./participation.js"></script>
 </body>
 </html>
