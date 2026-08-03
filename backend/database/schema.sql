@@ -84,10 +84,12 @@ CREATE TABLE IF NOT EXISTS donations (
   receipt_number text UNIQUE,
   status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','verified','rejected')),
   created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
   verified_at timestamptz,
   verified_by uuid REFERENCES users(id) ON DELETE SET NULL
 );
 ALTER TABLE donations ADD COLUMN IF NOT EXISTS receipt_number text;
+ALTER TABLE donations ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 CREATE UNIQUE INDEX IF NOT EXISTS idx_donations_receipt_unique ON donations(receipt_number) WHERE receipt_number IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS donation_attachments (
