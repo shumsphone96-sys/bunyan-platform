@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch src/bootstrap.js",
-    "start": "node src/bootstrap.js",
+    "start": "node src/schema-compat.js && node src/bootstrap.js",
     "db:init": "node scripts/migrate.js"
   },
   "engines": {"node": ">=20"},
