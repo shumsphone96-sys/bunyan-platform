@@ -31,7 +31,9 @@ jobs:
           node-version: '20'
 
       - name: Check JavaScript syntax
-        run: node --check admin-v2/app.js
+        run: |
+          node --check admin-v2/app.js
+          node --check admin-v2/finance.js
 
       - name: Verify Admin V2 contract and API protection
         run: node scripts/verify-admin-v2.mjs
