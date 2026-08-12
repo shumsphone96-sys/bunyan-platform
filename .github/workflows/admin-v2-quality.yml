@@ -5,12 +5,14 @@ on:
     branches: [rebuild-v2]
     paths:
       - 'admin-v2/**'
+      - 'backend/src/bootstrap.js'
       - 'scripts/verify-admin-v2.mjs'
       - '.github/workflows/admin-v2-quality.yml'
   pull_request:
     branches: [main]
     paths:
       - 'admin-v2/**'
+      - 'backend/src/bootstrap.js'
       - 'scripts/verify-admin-v2.mjs'
       - '.github/workflows/admin-v2-quality.yml'
 
@@ -34,6 +36,8 @@ jobs:
         run: |
           node --check admin-v2/app.js
           node --check admin-v2/finance.js
+          node --check admin-v2/news.js
+          node --check backend/src/bootstrap.js
 
       - name: Verify Admin V2 contract and API protection
         run: node scripts/verify-admin-v2.mjs
