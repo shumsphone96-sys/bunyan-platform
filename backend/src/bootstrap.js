@@ -133,4 +133,40 @@ app.delete('/api/finance/entries/:id',auth,allow('admin','manager'),asyncRoute(a
   res.status(204).end();
 }));
 
+const newsSchema=z.object({
+  title:z.string().trim().min(2).max(220),
+  body:z.string().trim().min(2).max(12000),
+  published_at:z.union([z.coerce.date(),z.null()]).optional(),
+  is_public:z.boolean().default(false)
+});
+
+app.get('/api/admin/news',auth,asyncRoute(async(_req,res)=>{
+  const {rows}=await pool.query('SELECT id,title,body,published_at,is_public,created_at FROM news ORDER BY created_at DESC LIMIT 1000');
+  res.json(rows);
+}));
+
+app.post('/api/admin/news',auth,allow('admin','manager','staff'),asyncRoute(async(req,res)=>{
+  const d=newsSchema.parse(req.body);
+  const {rows}=await pool.query('INSERT INTO news(title,body,published_at,is_public) VALUES($1,$2,$3,$4) RETURNING id,title,body,published_at,is_public,created_at',[d.title,d.body,d.published_at||null,d.is_public]);
+  res.status(201).json(rows[0]);
+}));
+
+app.patch('/api/admin/news/:id',auth,allow('admin','manager','staff'),asyncRoute(async(req,res)=>{
+  const d=newsSchema.partial().parse(req.body);
+  const map={title:'title',body:'body',published_at:'published_at',is_public:'is_public'};
+  const sets=[],values=[];
+  for(const [key,column] of Object.entries(map)){if(Object.hasOwn(d,key)){values.push(d[key]??null);sets.push(`${column}=$${values.length}`)}}
+  if(!sets.length)return res.status(400).json({error:'لا توجد تغييرات صالحة'});
+  values.push(req.params.id);
+  const {rows}=await pool.query(`UPDATE news SET ${sets.join(',')} WHERE id=$${values.length} RETURNING id,title,body,published_at,is_public,created_at`,values);
+  if(!rows[0])return res.status(404).json({error:'الخبر غير موجود'});
+  res.json(rows[0]);
+}));
+
+app.delete('/api/admin/news/:id',auth,allow('admin','manager'),asyncRoute(async(req,res)=>{
+  const result=await pool.query('DELETE FROM news WHERE id=$1',[req.params.id]);
+  if(!result.rowCount)return res.status(404).json({error:'الخبر غير موجود'});
+  res.status(204).end();
+}));
+
 app.use((err,req,res,_next)=>{console.error('[bunyan-bootstrap]',err);if(res.headersSent)return;if(err instanceof z.ZodError)return res.status(400).json({error:'بيانات غير صالحة',details:err.flatten()});res.status(500).json({error:process.env.NODE_ENV==='production'?'حدث خطأ داخلي':err.message})});
