@@ -5,7 +5,10 @@ const requiredFiles = [
   'admin-v2/styles.css',
   'admin-v2/app.js',
   'admin-v2/finance.js',
-  'admin-v2/finance.css'
+  'admin-v2/finance.css',
+  'admin-v2/news.js',
+  'admin-v2/news.css',
+  'backend/src/bootstrap.js'
 ];
 for (const file of requiredFiles) {
   const content = await readFile(file, 'utf8');
@@ -15,6 +18,8 @@ for (const file of requiredFiles) {
 const html = await readFile('admin-v2/index.html', 'utf8');
 const js = await readFile('admin-v2/app.js', 'utf8');
 const financeJs = await readFile('admin-v2/finance.js', 'utf8');
+const newsJs = await readFile('admin-v2/news.js', 'utf8');
+const bootstrap = await readFile('backend/src/bootstrap.js', 'utf8');
 
 const requiredHtmlIds = [
   'loginView', 'loginForm', 'loginMessage', 'appView', 'sidebar', 'adminNav',
@@ -28,6 +33,11 @@ for (const asset of ['./finance.css', './finance.js']) {
   if (!html.includes(asset)) throw new Error(`Finance asset is not wired in admin-v2/index.html: ${asset}`);
 }
 if (!html.includes('data-view="finance"')) throw new Error('Finance navigation entry is missing');
+
+for (const asset of ['./news.css', './news.js']) {
+  if (!html.includes(asset)) throw new Error(`News asset is not wired in admin-v2/index.html: ${asset}`);
+}
+if (!html.includes('data-view="news"')) throw new Error('News navigation entry is missing');
 
 const requiredRoutes = [
   '/api/auth/login', '/api/auth/me', '/api/dashboard', '/api/help/requests',
@@ -43,6 +53,19 @@ for (const route of ['/api/finance/entries','/api/projects']) {
 }
 for (const behavior of ['POST','PATCH','DELETE','data-finance-filter','data-finance-edit']) {
   if (!financeJs.includes(behavior)) throw new Error(`Missing finance behavior: ${behavior}`);
+}
+
+if (!newsJs.includes('/api/admin/news')) throw new Error('News workspace must use the protected admin news endpoint');
+for (const behavior of ['POST','PATCH','DELETE','data-news-filter','data-news-edit','data-news-toggle']) {
+  if (!newsJs.includes(behavior)) throw new Error(`Missing news behavior: ${behavior}`);
+}
+for (const signature of [
+  "app.get('/api/admin/news',auth",
+  "app.post('/api/admin/news',auth",
+  "app.patch('/api/admin/news/:id',auth",
+  "app.delete('/api/admin/news/:id',auth"
+]) {
+  if (!bootstrap.includes(signature)) throw new Error(`Missing protected news API contract: ${signature}`);
 }
 
 const requiredBehaviors = [
