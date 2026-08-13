@@ -5,6 +5,7 @@ const requiredFiles = [
   'admin-v2/finance.js','admin-v2/finance.css',
   'admin-v2/news.js','admin-v2/news.css',
   'admin-v2/users.js','admin-v2/users.css',
+  'admin-v2/audit.js','admin-v2/audit.css',
   'backend/src/bootstrap.js'
 ];
 for (const file of requiredFiles) {
@@ -17,6 +18,7 @@ const js = await readFile('admin-v2/app.js', 'utf8');
 const financeJs = await readFile('admin-v2/finance.js', 'utf8');
 const newsJs = await readFile('admin-v2/news.js', 'utf8');
 const usersJs = await readFile('admin-v2/users.js', 'utf8');
+const auditJs = await readFile('admin-v2/audit.js', 'utf8');
 const bootstrap = await readFile('backend/src/bootstrap.js', 'utf8');
 
 const requiredHtmlIds = ['loginView','loginForm','loginMessage','appView','sidebar','adminNav','menuButton','refreshButton','logoutButton','content','helpBadge','participationBadge'];
@@ -25,7 +27,8 @@ for (const id of requiredHtmlIds) if (!html.includes(`id="${id}"`)) throw new Er
 for (const [name,assets,view] of [
   ['Finance',['./finance.css','./finance.js'],'finance'],
   ['News',['./news.css','./news.js'],'news'],
-  ['Users',['./users.css','./users.js'],'users']
+  ['Users',['./users.css','./users.js'],'users'],
+  ['Audit',['./audit.css','./audit.js'],'audit']
 ]) {
   for (const asset of assets) if (!html.includes(asset)) throw new Error(`${name} asset is not wired: ${asset}`);
   if (!html.includes(`data-view="${view}"`)) throw new Error(`${name} navigation entry is missing`);
@@ -46,6 +49,9 @@ for (const behavior of ['POST','PATCH','data-user-filter','data-user-save','data
 for (const signature of ["app.get('/api/admin/users',auth,allow('admin')","app.post('/api/admin/users',auth,allow('admin')","app.patch('/api/admin/users/:id',auth,allow('admin')"]) if (!bootstrap.includes(signature)) throw new Error(`Missing protected users API contract: ${signature}`);
 for (const guard of ['لا يمكنك تعطيل حسابك الحالي','لا يمكنك خفض صلاحية حسابك الحالي','bcrypt.hash']) if (!bootstrap.includes(guard)) throw new Error(`Missing users safety guard: ${guard}`);
 
+if (!auditJs.includes('/api/audit-logs')) throw new Error('Audit workspace must use the protected audit endpoint');
+for (const behavior of ['summarize','renderAudit','data-view="audit"']) if (!auditJs.includes(behavior) && !html.includes(behavior)) throw new Error(`Missing audit behavior: ${behavior}`);
+
 const requiredBehaviors = ['sessionStorage.setItem','sessionStorage.removeItem','AbortController',"addEventListener('submit'", "addEventListener('click'"];
 for (const behavior of requiredBehaviors) if (!js.includes(behavior)) throw new Error(`Missing behavior: ${behavior}`);
 
@@ -54,7 +60,7 @@ if (!health.ok) throw new Error(`API health failed with ${health.status}`);
 const healthBody = await health.json();
 if (!healthBody.ok) throw new Error('API health payload did not report ok=true');
 
-for (const protectedRoute of ['/api/dashboard','/api/help/requests','/api/requests','/api/finance/entries','/api/admin/news','/api/admin/users']) {
+for (const protectedRoute of ['/api/dashboard','/api/help/requests','/api/requests','/api/finance/entries','/api/admin/news','/api/admin/users','/api/audit-logs']) {
   const response = await fetch(`https://api.bunyan-sudan.org${protectedRoute}`, { signal: AbortSignal.timeout(15000) });
   if (response.status !== 401) throw new Error(`Protected route ${protectedRoute} must return 401 without a token, got ${response.status}`);
 }
