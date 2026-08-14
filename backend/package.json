@@ -1,11 +1,11 @@
 {
   "name": "bunyan-cloud-api",
-  "version": "8.0.0",
+  "version": "8.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --watch src/bootstrap.js",
-    "start": "node src/bootstrap.js",
+    "dev": "node --watch src/bootstrap-v2.js",
+    "start": "node src/bootstrap-v2.js",
     "db:init": "node scripts/migrate.js"
   },
   "engines": {"node": ">=20"},
