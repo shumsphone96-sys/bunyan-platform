@@ -6,7 +6,8 @@ const requiredFiles = [
   'admin-v2/news.js','admin-v2/news.css',
   'admin-v2/users.js','admin-v2/users.css',
   'admin-v2/audit.js','admin-v2/audit.css',
-  'backend/src/bootstrap.js'
+  'admin-v2/backup.js','admin-v2/backup.css',
+  'backend/src/bootstrap.js','backend/src/bootstrap-v2.js','backend/package.json'
 ];
 for (const file of requiredFiles) {
   const content = await readFile(file, 'utf8');
@@ -19,7 +20,10 @@ const financeJs = await readFile('admin-v2/finance.js', 'utf8');
 const newsJs = await readFile('admin-v2/news.js', 'utf8');
 const usersJs = await readFile('admin-v2/users.js', 'utf8');
 const auditJs = await readFile('admin-v2/audit.js', 'utf8');
+const backupJs = await readFile('admin-v2/backup.js', 'utf8');
 const bootstrap = await readFile('backend/src/bootstrap.js', 'utf8');
+const bootstrapV2 = await readFile('backend/src/bootstrap-v2.js', 'utf8');
+const packageJson = await readFile('backend/package.json', 'utf8');
 
 const requiredHtmlIds = ['loginView','loginForm','loginMessage','appView','sidebar','adminNav','menuButton','refreshButton','logoutButton','content','helpBadge','participationBadge'];
 for (const id of requiredHtmlIds) if (!html.includes(`id="${id}"`)) throw new Error(`Missing required element: #${id}`);
@@ -28,7 +32,8 @@ for (const [name,assets,view] of [
   ['Finance',['./finance.css','./finance.js'],'finance'],
   ['News',['./news.css','./news.js'],'news'],
   ['Users',['./users.css','./users.js'],'users'],
-  ['Audit',['./audit.css','./audit.js'],'audit']
+  ['Audit',['./audit.css','./audit.js'],'audit'],
+  ['Backup',['./backup.css','./backup.js'],'backup']
 ]) {
   for (const asset of assets) if (!html.includes(asset)) throw new Error(`${name} asset is not wired: ${asset}`);
   if (!html.includes(`data-view="${view}"`)) throw new Error(`${name} navigation entry is missing`);
@@ -51,6 +56,13 @@ for (const guard of ['لا يمكنك تعطيل حسابك الحالي','لا 
 
 if (!auditJs.includes('/api/audit-logs')) throw new Error('Audit workspace must use the protected audit endpoint');
 for (const behavior of ['summarize','renderAudit','data-view="audit"']) if (!auditJs.includes(behavior) && !html.includes(behavior)) throw new Error(`Missing audit behavior: ${behavior}`);
+
+for (const route of ['/api/admin/backup/status','/api/admin/backup/export','/api/admin/backup/import']) {
+  if (!backupJs.includes(route)) throw new Error(`Backup workspace missing route: ${route}`);
+  if (!bootstrapV2.includes(route)) throw new Error(`Backup backend missing route: ${route}`);
+}
+for (const guard of ['RESTORE_BUNYAN','adminOnly','BEGIN','ROLLBACK','COMMIT']) if (!bootstrapV2.includes(guard)) throw new Error(`Backup restore guard missing: ${guard}`);
+if (!packageJson.includes('src/bootstrap-v2.js')) throw new Error('Backend start script must use bootstrap-v2.js');
 
 const requiredBehaviors = ['sessionStorage.setItem','sessionStorage.removeItem','AbortController',"addEventListener('submit'", "addEventListener('click'"];
 for (const behavior of requiredBehaviors) if (!js.includes(behavior)) throw new Error(`Missing behavior: ${behavior}`);
