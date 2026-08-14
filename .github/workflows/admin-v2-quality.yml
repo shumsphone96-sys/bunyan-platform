@@ -44,6 +44,7 @@ jobs:
           node --check admin-v2/users.js
           node --check admin-v2/audit.js
           node --check admin-v2/backup.js
+          node --check admin-v2/settings.js
           node --check backend/src/bootstrap.js
           node --check backend/src/bootstrap-v2.js
 
