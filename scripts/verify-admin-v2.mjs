@@ -7,6 +7,7 @@ const requiredFiles = [
   'admin-v2/users.js','admin-v2/users.css',
   'admin-v2/audit.js','admin-v2/audit.css',
   'admin-v2/backup.js','admin-v2/backup.css',
+  'admin-v2/settings.js','admin-v2/settings.css',
   'backend/src/bootstrap.js','backend/src/bootstrap-v2.js','backend/package.json'
 ];
 for (const file of requiredFiles) {
@@ -21,6 +22,7 @@ const newsJs = await readFile('admin-v2/news.js', 'utf8');
 const usersJs = await readFile('admin-v2/users.js', 'utf8');
 const auditJs = await readFile('admin-v2/audit.js', 'utf8');
 const backupJs = await readFile('admin-v2/backup.js', 'utf8');
+const settingsJs = await readFile('admin-v2/settings.js', 'utf8');
 const bootstrap = await readFile('backend/src/bootstrap.js', 'utf8');
 const bootstrapV2 = await readFile('backend/src/bootstrap-v2.js', 'utf8');
 const packageJson = await readFile('backend/package.json', 'utf8');
@@ -33,13 +35,14 @@ for (const [name,assets,view] of [
   ['News',['./news.css','./news.js'],'news'],
   ['Users',['./users.css','./users.js'],'users'],
   ['Audit',['./audit.css','./audit.js'],'audit'],
-  ['Backup',['./backup.css','./backup.js'],'backup']
+  ['Backup',['./backup.css','./backup.js'],'backup'],
+  ['Settings',['./settings.css','./settings.js'],'settings']
 ]) {
   for (const asset of assets) if (!html.includes(asset)) throw new Error(`${name} asset is not wired: ${asset}`);
   if (!html.includes(`data-view="${view}"`)) throw new Error(`${name} navigation entry is missing`);
 }
 
-const requiredRoutes = ['/api/auth/login','/api/auth/me','/api/dashboard','/api/help/requests','/api/requests','/api/donations','/api/projects','/api/beneficiaries','/api/volunteers','/api/news'];
+const requiredRoutes = ['/api/auth/login','/api/auth/me','/api/dashboard','/api/dashboard/insights','/api/help/requests','/api/requests','/api/donations','/api/projects','/api/beneficiaries','/api/volunteers','/api/news'];
 for (const route of requiredRoutes) if (!js.includes(route)) throw new Error(`Missing API route in admin-v2/app.js: ${route}`);
 
 for (const route of ['/api/finance/entries','/api/projects']) if (!financeJs.includes(route)) throw new Error(`Missing API route in finance workspace: ${route}`);
@@ -63,6 +66,13 @@ for (const route of ['/api/admin/backup/status','/api/admin/backup/export','/api
 }
 for (const guard of ['RESTORE_BUNYAN','adminOnly','BEGIN','ROLLBACK','COMMIT']) if (!bootstrapV2.includes(guard)) throw new Error(`Backup restore guard missing: ${guard}`);
 if (!packageJson.includes('src/bootstrap-v2.js')) throw new Error('Backend start script must use bootstrap-v2.js');
+
+for (const route of ['/api/admin/settings']) {
+  if (!settingsJs.includes(route)) throw new Error(`Settings workspace missing route: ${route}`);
+  if (!bootstrapV2.includes(route)) throw new Error(`Settings backend missing route: ${route}`);
+}
+for (const signature of ["app.get('/api/admin/settings',auth,adminOnly","app.patch('/api/admin/settings',auth,adminOnly","app.get('/api/dashboard/insights',auth"]) if (!bootstrapV2.includes(signature)) throw new Error(`Missing V2 API contract: ${signature}`);
+if (!bootstrapV2.includes('CREATE TABLE IF NOT EXISTS system_settings')) throw new Error('System settings storage is missing');
 
 const requiredBehaviors = ['sessionStorage.setItem','sessionStorage.removeItem','AbortController',"addEventListener('submit'", "addEventListener('click'"];
 for (const behavior of requiredBehaviors) if (!js.includes(behavior)) throw new Error(`Missing behavior: ${behavior}`);
