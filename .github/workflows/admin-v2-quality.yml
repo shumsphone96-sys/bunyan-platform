@@ -6,6 +6,8 @@ on:
     paths:
       - 'admin-v2/**'
       - 'backend/src/bootstrap.js'
+      - 'backend/src/bootstrap-v2.js'
+      - 'backend/package.json'
       - 'scripts/verify-admin-v2.mjs'
       - '.github/workflows/admin-v2-quality.yml'
   pull_request:
@@ -13,6 +15,8 @@ on:
     paths:
       - 'admin-v2/**'
       - 'backend/src/bootstrap.js'
+      - 'backend/src/bootstrap-v2.js'
+      - 'backend/package.json'
       - 'scripts/verify-admin-v2.mjs'
       - '.github/workflows/admin-v2-quality.yml'
 
@@ -39,7 +43,9 @@ jobs:
           node --check admin-v2/news.js
           node --check admin-v2/users.js
           node --check admin-v2/audit.js
+          node --check admin-v2/backup.js
           node --check backend/src/bootstrap.js
+          node --check backend/src/bootstrap-v2.js
 
       - name: Verify Admin V2 contract and API protection
         run: node scripts/verify-admin-v2.mjs
