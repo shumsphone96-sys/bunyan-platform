@@ -38,6 +38,23 @@ const backupSchema=z.object({version:z.string().min(1),createdAt:z.string().opti
 async function counts(client=pool){const out={};for(const table of restoreOrder){const r=await client.query(`SELECT count(*)::int count FROM ${table}`);out[table]=r.rows[0].count}return out}
 async function audit(req,action,metadata={}){try{await pool.query('INSERT INTO audit_logs(user_id,action,entity_type,metadata,ip_address) VALUES($1,$2,$3,$4,$5)',[req.user?.sub||null,action,'backup',metadata,req.ip||null])}catch{}}
 
+await pool.query(`CREATE TABLE IF NOT EXISTS system_settings(
+  id SMALLINT PRIMARY KEY DEFAULT 1 CHECK(id=1),
+  site_name VARCHAR(120) NOT NULL DEFAULT 'بُنْيَان',
+  tagline VARCHAR(220) NOT NULL DEFAULT '',
+  contact_email VARCHAR(320) NOT NULL DEFAULT '',
+  contact_phone VARCHAR(60) NOT NULL DEFAULT '',
+  default_currency VARCHAR(3) NOT NULL DEFAULT 'SDG' CHECK(default_currency IN ('SDG','SAR','USD')),
+  public_finance BOOLEAN NOT NULL DEFAULT TRUE,
+  accept_help_requests BOOLEAN NOT NULL DEFAULT TRUE,
+  accept_donations BOOLEAN NOT NULL DEFAULT TRUE,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+INSERT INTO system_settings(id) VALUES(1) ON CONFLICT(id) DO NOTHING;`);
+const settingsSchema=z.object({site_name:z.string().trim().min(2).max(120),tagline:z.string().max(220).default(''),contact_email:z.union([z.string().email().max(320),z.literal('')]).default(''),contact_phone:z.string().max(60).default(''),default_currency:z.enum(['SDG','SAR','USD']).default('SDG'),public_finance:z.boolean(),accept_help_requests:z.boolean(),accept_donations:z.boolean()});
+app.get('/api/admin/settings',auth,adminOnly,asyncRoute(async(_req,res)=>{const {rows}=await pool.query('SELECT site_name,tagline,contact_email,contact_phone,default_currency,public_finance,accept_help_requests,accept_donations,updated_at FROM system_settings WHERE id=1');res.json(rows[0])}));
+app.patch('/api/admin/settings',auth,adminOnly,asyncRoute(async(req,res)=>{const d=settingsSchema.parse(req.body);const {rows}=await pool.query('UPDATE system_settings SET site_name=$1,tagline=$2,contact_email=$3,contact_phone=$4,default_currency=$5,public_finance=$6,accept_help_requests=$7,accept_donations=$8,updated_at=now() WHERE id=1 RETURNING site_name,tagline,contact_email,contact_phone,default_currency,public_finance,accept_help_requests,accept_donations,updated_at',[d.site_name,d.tagline,d.contact_email,d.contact_phone,d.default_currency,d.public_finance,d.accept_help_requests,d.accept_donations]);res.json(rows[0])}));
+
 app.get('/api/admin/backup/status',auth,adminOnly,asyncRoute(async(_req,res)=>res.json({version:'9.0-backup',counts:await counts()})));
 app.get('/api/admin/backup/export',auth,adminOnly,asyncRoute(async(req,res)=>{const data={};for(const table of restoreOrder)data[table]=(await pool.query(`SELECT * FROM ${table} ORDER BY created_at DESC`)).rows;const backup={version:'9.0-backup',createdAt:new Date().toISOString(),data};await audit(req,'export',{tables:restoreOrder.length});res.setHeader('Content-Disposition',`attachment; filename="bunyan-backup-${new Date().toISOString().slice(0,10)}.json"`);res.json(backup)}));
 
