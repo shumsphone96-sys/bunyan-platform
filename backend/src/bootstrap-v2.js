@@ -55,6 +55,17 @@ const settingsSchema=z.object({site_name:z.string().trim().min(2).max(120),tagli
 app.get('/api/admin/settings',auth,adminOnly,asyncRoute(async(_req,res)=>{const {rows}=await pool.query('SELECT site_name,tagline,contact_email,contact_phone,default_currency,public_finance,accept_help_requests,accept_donations,updated_at FROM system_settings WHERE id=1');res.json(rows[0])}));
 app.patch('/api/admin/settings',auth,adminOnly,asyncRoute(async(req,res)=>{const d=settingsSchema.parse(req.body);const {rows}=await pool.query('UPDATE system_settings SET site_name=$1,tagline=$2,contact_email=$3,contact_phone=$4,default_currency=$5,public_finance=$6,accept_help_requests=$7,accept_donations=$8,updated_at=now() WHERE id=1 RETURNING site_name,tagline,contact_email,contact_phone,default_currency,public_finance,accept_help_requests,accept_donations,updated_at',[d.site_name,d.tagline,d.contact_email,d.contact_phone,d.default_currency,d.public_finance,d.accept_help_requests,d.accept_donations]);res.json(rows[0])}));
 
+app.get('/api/dashboard/insights',auth,asyncRoute(async(_req,res)=>{
+  const [projectStats,donationStats,newsStats,financeStats,recentStats]=await Promise.all([
+    pool.query(`SELECT count(*)::int total,count(*) FILTER(WHERE progress>=100)::int completed,count(*) FILTER(WHERE progress>0 AND progress<100)::int active,coalesce(avg(progress),0)::numeric(6,2) avg_progress FROM projects`),
+    pool.query(`SELECT count(*)::int total,count(*) FILTER(WHERE status='verified')::int verified,count(*) FILTER(WHERE status='pending')::int pending FROM donations`),
+    pool.query(`SELECT count(*)::int total,count(*) FILTER(WHERE is_public=true AND published_at IS NOT NULL)::int published FROM news`),
+    pool.query(`SELECT currency,coalesce(sum(amount) FILTER(WHERE entry_type='income'),0) income,coalesce(sum(amount) FILTER(WHERE entry_type='expense'),0) expense FROM financial_entries GROUP BY currency ORDER BY currency`),
+    pool.query(`SELECT (SELECT count(*) FROM help_requests WHERE created_at>=now()-interval '30 days')::int help_30d,(SELECT count(*) FROM participation_requests WHERE created_at>=now()-interval '30 days')::int participation_30d,(SELECT count(*) FROM donations WHERE created_at>=now()-interval '30 days')::int donations_30d`)
+  ]);
+  res.json({projects:projectStats.rows[0],donations:donationStats.rows[0],news:newsStats.rows[0],finance:financeStats.rows.map(r=>({...r,balance:Number(r.income)-Number(r.expense)})),recent:recentStats.rows[0]});
+}));
+
 app.get('/api/admin/backup/status',auth,adminOnly,asyncRoute(async(_req,res)=>res.json({version:'9.0-backup',counts:await counts()})));
 app.get('/api/admin/backup/export',auth,adminOnly,asyncRoute(async(req,res)=>{const data={};for(const table of restoreOrder)data[table]=(await pool.query(`SELECT * FROM ${table} ORDER BY created_at DESC`)).rows;const backup={version:'9.0-backup',createdAt:new Date().toISOString(),data};await audit(req,'export',{tables:restoreOrder.length});res.setHeader('Content-Disposition',`attachment; filename="bunyan-backup-${new Date().toISOString().slice(0,10)}.json"`);res.json(backup)}));
 
