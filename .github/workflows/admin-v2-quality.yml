@@ -102,7 +102,7 @@ jobs:
           for route in \
             /api/admin/news \
             /api/admin/users \
-            /api/admin/settings \
+            /api/v2/admin/settings \
             /api/admin/backup/status \
             /api/admin/backup/export \
             /api/dashboard/insights \
