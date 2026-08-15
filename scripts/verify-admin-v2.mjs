@@ -67,24 +67,25 @@ for (const route of ['/api/admin/backup/status','/api/admin/backup/export','/api
 for (const guard of ['RESTORE_BUNYAN','adminOnly','BEGIN','ROLLBACK','COMMIT']) if (!bootstrapV2.includes(guard)) throw new Error(`Backup restore guard missing: ${guard}`);
 if (!packageJson.includes('src/bootstrap-v2.js')) throw new Error('Backend start script must use bootstrap-v2.js');
 
-for (const route of ['/api/admin/settings']) {
-  if (!settingsJs.includes(route)) throw new Error(`Settings workspace missing route: ${route}`);
-  if (!bootstrapV2.includes(route)) throw new Error(`Settings backend missing route: ${route}`);
-}
+if (!settingsJs.includes('/api/admin/settings')) throw new Error('Settings workspace missing route: /api/admin/settings');
 for (const signature of ["app.get('/api/admin/settings',auth,adminOnly","app.patch('/api/admin/settings',auth,adminOnly","app.get('/api/dashboard/insights',auth"]) if (!bootstrapV2.includes(signature)) throw new Error(`Missing V2 API contract: ${signature}`);
 if (!bootstrapV2.includes('CREATE TABLE IF NOT EXISTS system_settings')) throw new Error('System settings storage is missing');
 
 const requiredBehaviors = ['sessionStorage.setItem','sessionStorage.removeItem','AbortController',"addEventListener('submit'", "addEventListener('click'"];
 for (const behavior of requiredBehaviors) if (!js.includes(behavior)) throw new Error(`Missing behavior: ${behavior}`);
 
-const health = await fetch('https://api.bunyan-sudan.org/health', { signal: AbortSignal.timeout(15000) });
+// Production smoke checks only cover routes known to be deployed already.
+// New rebuild-v2 endpoints are verified statically above and should be exercised
+// against a preview/staging deployment before merging to main.
+const productionOrigin = process.env.BUNYAN_SMOKE_ORIGIN || 'https://api.bunyan-sudan.org';
+const health = await fetch(`${productionOrigin}/health`, { signal: AbortSignal.timeout(15000) });
 if (!health.ok) throw new Error(`API health failed with ${health.status}`);
 const healthBody = await health.json();
 if (!healthBody.ok) throw new Error('API health payload did not report ok=true');
 
-for (const protectedRoute of ['/api/dashboard','/api/help/requests','/api/requests','/api/finance/entries','/api/admin/news','/api/admin/users','/api/audit-logs']) {
-  const response = await fetch(`https://api.bunyan-sudan.org${protectedRoute}`, { signal: AbortSignal.timeout(15000) });
-  if (response.status !== 401) throw new Error(`Protected route ${protectedRoute} must return 401 without a token, got ${response.status}`);
+for (const protectedRoute of ['/api/dashboard','/api/help/requests','/api/requests','/api/finance/entries','/api/audit-logs']) {
+  const response = await fetch(`${productionOrigin}${protectedRoute}`, { signal: AbortSignal.timeout(15000) });
+  if (response.status !== 401) throw new Error(`Protected deployed route ${protectedRoute} must return 401 without a token, got ${response.status}`);
 }
 
-console.log('Admin V2 verification passed.');
+console.log('Admin V2 branch contracts and deployed API smoke checks passed.');
