@@ -7,6 +7,7 @@ on:
       - 'admin-v2/**'
       - 'backend/**'
       - 'scripts/verify-admin-v2.mjs'
+      - 'scripts/smoke-admin-v2-preview.mjs'
       - '.github/workflows/admin-v2-quality.yml'
   pull_request:
     branches: [main]
@@ -14,6 +15,7 @@ on:
       - 'admin-v2/**'
       - 'backend/**'
       - 'scripts/verify-admin-v2.mjs'
+      - 'scripts/smoke-admin-v2-preview.mjs'
       - '.github/workflows/admin-v2-quality.yml'
 
 permissions:
@@ -43,6 +45,10 @@ jobs:
       PORT: 8080
       NODE_ENV: test
       BUNYAN_SMOKE_ORIGIN: http://127.0.0.1:8080
+      BUNYAN_PREVIEW_ORIGIN: http://127.0.0.1:8080
+      ADMIN_EMAIL: preview-admin@example.test
+      ADMIN_NAME: Preview Admin
+      ADMIN_RESET_PASSWORD: PreviewPass123!
 
     steps:
       - name: Checkout
@@ -64,12 +70,13 @@ jobs:
           node --check admin-v2/settings.js
           node --check backend/src/bootstrap.js
           node --check backend/src/bootstrap-v2.js
+          node --check scripts/smoke-admin-v2-preview.mjs
 
       - name: Install backend dependencies
         working-directory: backend
         run: npm install --no-audit --no-fund
 
-      - name: Prepare preview database
+      - name: Prepare preview database and admin
         working-directory: backend
         run: npm run db:init
 
@@ -98,7 +105,8 @@ jobs:
             /api/admin/settings \
             /api/admin/backup/status \
             /api/admin/backup/export \
-            /api/dashboard/insights; do
+            /api/dashboard/insights \
+            /api/v2/finance/entries; do
             code=$(curl --silent --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:8080${route}")
             if [ "$code" != "401" ]; then
               echo "Protected preview route ${route} expected 401, got ${code}"
@@ -106,6 +114,9 @@ jobs:
               exit 1
             fi
           done
+
+      - name: Run isolated Admin V2 CRUD smoke test
+        run: node scripts/smoke-admin-v2-preview.mjs
 
       - name: Upload backend log on failure
         if: failure()
