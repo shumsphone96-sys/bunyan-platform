@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import pg from 'pg';
+import bcrypt from 'bcryptjs';
 import { rateLimit } from 'express-rate-limit';
 import { z } from 'zod';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -131,6 +132,93 @@ app.delete('/api/finance/entries/:id',auth,allow('admin','manager'),asyncRoute(a
   const result=await pool.query('DELETE FROM financial_entries WHERE id=$1',[req.params.id]);
   if(!result.rowCount)return res.status(404).json({error:'الحركة المالية غير موجودة'});
   res.status(204).end();
+}));
+
+const newsSchema=z.object({
+  title:z.string().trim().min(2).max(220),
+  body:z.string().trim().min(2).max(12000),
+  published_at:z.union([z.coerce.date(),z.null()]).optional(),
+  is_public:z.boolean().default(false)
+});
+
+app.get('/api/admin/news',auth,asyncRoute(async(_req,res)=>{
+  const {rows}=await pool.query('SELECT id,title,body,published_at,is_public,created_at FROM news ORDER BY created_at DESC LIMIT 1000');
+  res.json(rows);
+}));
+
+app.post('/api/admin/news',auth,allow('admin','manager','staff'),asyncRoute(async(req,res)=>{
+  const d=newsSchema.parse(req.body);
+  const {rows}=await pool.query('INSERT INTO news(title,body,published_at,is_public) VALUES($1,$2,$3,$4) RETURNING id,title,body,published_at,is_public,created_at',[d.title,d.body,d.published_at||null,d.is_public]);
+  res.status(201).json(rows[0]);
+}));
+
+app.patch('/api/admin/news/:id',auth,allow('admin','manager','staff'),asyncRoute(async(req,res)=>{
+  const d=newsSchema.partial().parse(req.body);
+  const map={title:'title',body:'body',published_at:'published_at',is_public:'is_public'};
+  const sets=[],values=[];
+  for(const [key,column] of Object.entries(map)){if(Object.hasOwn(d,key)){values.push(d[key]??null);sets.push(`${column}=$${values.length}`)}}
+  if(!sets.length)return res.status(400).json({error:'لا توجد تغييرات صالحة'});
+  values.push(req.params.id);
+  const {rows}=await pool.query(`UPDATE news SET ${sets.join(',')} WHERE id=$${values.length} RETURNING id,title,body,published_at,is_public,created_at`,values);
+  if(!rows[0])return res.status(404).json({error:'الخبر غير موجود'});
+  res.json(rows[0]);
+}));
+
+app.delete('/api/admin/news/:id',auth,allow('admin','manager'),asyncRoute(async(req,res)=>{
+  const result=await pool.query('DELETE FROM news WHERE id=$1',[req.params.id]);
+  if(!result.rowCount)return res.status(404).json({error:'الخبر غير موجود'});
+  res.status(204).end();
+}));
+
+const userCreateSchema=z.object({
+  name:z.string().trim().min(2).max(160),
+  email:z.string().email().max(320),
+  password:z.string().min(10).max(128),
+  role:z.enum(['admin','manager','staff','viewer']).default('staff')
+});
+const userUpdateSchema=z.object({
+  name:z.string().trim().min(2).max(160).optional(),
+  email:z.string().email().max(320).optional(),
+  password:z.string().min(10).max(128).optional(),
+  role:z.enum(['admin','manager','staff','viewer']).optional(),
+  is_active:z.boolean().optional()
+});
+async function userAudit(req,action,targetId,metadata={}){try{await pool.query('INSERT INTO audit_logs(user_id,action,entity_type,entity_id,metadata,ip_address) VALUES($1,$2,$3,$4,$5,$6)',[req.user.sub,action,'user',targetId,metadata,req.ip||null])}catch{}}
+
+app.get('/api/admin/users',auth,allow('admin'),asyncRoute(async(_req,res)=>{
+  const {rows}=await pool.query('SELECT id,name,email,role,is_active,created_at,updated_at FROM users ORDER BY created_at DESC');
+  res.json(rows);
+}));
+
+app.post('/api/admin/users',auth,allow('admin'),asyncRoute(async(req,res)=>{
+  const d=userCreateSchema.parse(req.body);
+  const email=d.email.toLowerCase();
+  const exists=await pool.query('SELECT 1 FROM users WHERE email=$1',[email]);
+  if(exists.rowCount)return res.status(409).json({error:'البريد الإلكتروني مستخدم بالفعل'});
+  const hash=await bcrypt.hash(d.password,12);
+  const {rows}=await pool.query('INSERT INTO users(name,email,password_hash,role,is_active) VALUES($1,$2,$3,$4,true) RETURNING id,name,email,role,is_active,created_at,updated_at',[d.name,email,hash,d.role]);
+  await userAudit(req,'create',rows[0].id,{role:d.role});
+  res.status(201).json(rows[0]);
+}));
+
+app.patch('/api/admin/users/:id',auth,allow('admin'),asyncRoute(async(req,res)=>{
+  const id=z.string().uuid().parse(req.params.id);
+  const d=userUpdateSchema.parse(req.body);
+  const current=(await pool.query('SELECT id,name,email,role,is_active FROM users WHERE id=$1',[id])).rows[0];
+  if(!current)return res.status(404).json({error:'المستخدم غير موجود'});
+  if(id===req.user.sub){
+    if(Object.hasOwn(d,'is_active')&&d.is_active===false)return res.status(400).json({error:'لا يمكنك تعطيل حسابك الحالي'});
+    if(Object.hasOwn(d,'role')&&d.role!=='admin')return res.status(400).json({error:'لا يمكنك خفض صلاحية حسابك الحالي'});
+  }
+  if(d.email){const email=d.email.toLowerCase();const exists=await pool.query('SELECT 1 FROM users WHERE email=$1 AND id<>$2',[email,id]);if(exists.rowCount)return res.status(409).json({error:'البريد الإلكتروني مستخدم بالفعل'});d.email=email}
+  const sets=[],values=[];
+  for(const key of ['name','email','role','is_active'])if(Object.hasOwn(d,key)){values.push(d[key]);sets.push(`${key}=$${values.length}`)}
+  if(d.password){values.push(await bcrypt.hash(d.password,12));sets.push(`password_hash=$${values.length}`)}
+  if(!sets.length)return res.status(400).json({error:'لا توجد تغييرات صالحة'});
+  values.push(id);
+  const {rows}=await pool.query(`UPDATE users SET ${sets.join(',')},updated_at=now() WHERE id=$${values.length} RETURNING id,name,email,role,is_active,created_at,updated_at`,values);
+  await userAudit(req,'update',id,{role:rows[0].role,is_active:rows[0].is_active,password_changed:Boolean(d.password)});
+  res.json(rows[0]);
 }));
 
 app.use((err,req,res,_next)=>{console.error('[bunyan-bootstrap]',err);if(res.headersSent)return;if(err instanceof z.ZodError)return res.status(400).json({error:'بيانات غير صالحة',details:err.flatten()});res.status(500).json({error:process.env.NODE_ENV==='production'?'حدث خطأ داخلي':err.message})});
