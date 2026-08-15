@@ -5,18 +5,14 @@ on:
     branches: [rebuild-v2]
     paths:
       - 'admin-v2/**'
-      - 'backend/src/bootstrap.js'
-      - 'backend/src/bootstrap-v2.js'
-      - 'backend/package.json'
+      - 'backend/**'
       - 'scripts/verify-admin-v2.mjs'
       - '.github/workflows/admin-v2-quality.yml'
   pull_request:
     branches: [main]
     paths:
       - 'admin-v2/**'
-      - 'backend/src/bootstrap.js'
-      - 'backend/src/bootstrap-v2.js'
-      - 'backend/package.json'
+      - 'backend/**'
       - 'scripts/verify-admin-v2.mjs'
       - '.github/workflows/admin-v2-quality.yml'
 
@@ -26,7 +22,28 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: bunyan
+          POSTGRES_PASSWORD: bunyan_ci
+          POSTGRES_DB: bunyan_preview
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U bunyan -d bunyan_preview"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DATABASE_URL: postgresql://bunyan:bunyan_ci@127.0.0.1:5432/bunyan_preview
+      JWT_SECRET: ci-preview-secret-not-for-production-2026
+      PORT: 8080
+      NODE_ENV: test
+      BUNYAN_SMOKE_ORIGIN: http://127.0.0.1:8080
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -48,8 +65,56 @@ jobs:
           node --check backend/src/bootstrap.js
           node --check backend/src/bootstrap-v2.js
 
-      - name: Verify Admin V2 contract and API protection
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm install --no-audit --no-fund
+
+      - name: Prepare preview database
+        working-directory: backend
+        run: npm run db:init
+
+      - name: Start rebuild-v2 backend preview
+        working-directory: backend
+        run: |
+          npm start > /tmp/bunyan-preview.log 2>&1 &
+          echo $! > /tmp/bunyan-preview.pid
+          for i in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8080/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/bunyan-preview.log
+          exit 1
+
+      - name: Verify Admin V2 contracts against preview backend
         run: node scripts/verify-admin-v2.mjs
+
+      - name: Verify rebuild-v2 protected endpoints
+        run: |
+          for route in \
+            /api/admin/news \
+            /api/admin/users \
+            /api/admin/settings \
+            /api/admin/backup/status \
+            /api/admin/backup/export \
+            /api/dashboard/insights; do
+            code=$(curl --silent --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:8080${route}")
+            if [ "$code" != "401" ]; then
+              echo "Protected preview route ${route} expected 401, got ${code}"
+              cat /tmp/bunyan-preview.log
+              exit 1
+            fi
+          done
+
+      - name: Upload backend log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bunyan-backend-preview-log
+          path: /tmp/bunyan-preview.log
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Package isolated preview artifact
         uses: actions/upload-artifact@v4
