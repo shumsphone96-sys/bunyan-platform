@@ -31,101 +31,15 @@ async function fApi(path,options={}){
   throw lastError||new Error('تعذر الاتصال بالخادم');
 }
 
-function fTotals(rows){
-  const totals={};
-  for(const row of rows){
-    const currency=row.currency||'SDG';
-    totals[currency]??={income:0,expense:0};
-    totals[currency][row.entry_type==='expense'?'expense':'income']+=Number(row.amount||0);
-  }
-  return totals;
-}
+function fTotals(rows){const totals={};for(const row of rows){const currency=row.currency||'SDG';totals[currency]??={income:0,expense:0};totals[currency][row.entry_type==='expense'?'expense':'income']+=Number(row.amount||0)}return totals}
 function fProjectName(id){return financeProjects.find(p=>String(p.id)===String(id))?.name||'عام'}
-function fSummary(){
-  const totals=fTotals(financeRows);
-  const currencies=['SDG','SAR','USD'].filter(c=>totals[c]);
-  if(!currencies.length)return '<div class="finance-empty-summary">لا توجد حركات مالية بعد.</div>';
-  return currencies.map(c=>{const t=totals[c],balance=t.income-t.expense;return `<article class="finance-summary-card"><header><strong>${c}</strong></header><div><span>الإيرادات</span><b>${fEsc(fMoney(t.income,c))}</b></div><div><span>المصروفات</span><b>${fEsc(fMoney(t.expense,c))}</b></div><div class="balance"><span>الرصيد</span><b>${fEsc(fMoney(balance,c))}</b></div></article>`}).join('');
-}
-function fProjectOptions(selected=''){
-  return `<option value="">عام / بدون مشروع</option>${financeProjects.map(p=>`<option value="${fEsc(p.id)}" ${String(selected)===String(p.id)?'selected':''}>${fEsc(p.name)}</option>`).join('')}`;
-}
-function fForm(row=null){
-  const editing=Boolean(row);
-  return `<form id="financeEntryForm" class="finance-form" data-edit-id="${editing?fEsc(row.id):''}">
-    <div class="finance-form-head"><div><h4>${editing?'تعديل حركة مالية':'إضافة حركة مالية'}</h4><p>سجّل الإيراد أو المصروف مع المرجع والإثبات عند الحاجة.</p></div>${editing?'<button type="button" class="ghost compact" data-finance-cancel>إلغاء التعديل</button>':''}</div>
-    <div class="finance-form-grid">
-      <label>نوع الحركة<select name="entry_type" required><option value="income" ${row?.entry_type==='income'?'selected':''}>إيراد</option><option value="expense" ${row?.entry_type==='expense'?'selected':''}>مصروف</option></select></label>
-      <label>المبلغ<input name="amount" type="number" min="0.01" step="0.01" value="${editing?fEsc(row.amount):''}" required></label>
-      <label>العملة<select name="currency" required>${['SDG','SAR','USD'].map(c=>`<option value="${c}" ${row?.currency===c?'selected':''}>${c}</option>`).join('')}</select></label>
-      <label>التاريخ<input name="entry_date" type="date" value="${fEsc(row?.entry_date?.slice?.(0,10)||fToday())}" required></label>
-      <label class="wide">العنوان<input name="title" maxlength="200" value="${fEsc(row?.title||'')}" required></label>
-      <label>التصنيف<input name="category" maxlength="120" value="${fEsc(row?.category||'')}" placeholder="مثال: تبرعات، مواد، ترحيل"></label>
-      <label>المشروع<select name="project_id">${fProjectOptions(row?.project_id||'')}</select></label>
-      <label>الرقم المرجعي<input name="reference_number" maxlength="160" value="${fEsc(row?.reference_number||'')}" placeholder="رقم إيصال أو تحويل"></label>
-      <label class="wide">رابط الإثبات<input name="proof_url" type="url" maxlength="2000" value="${fEsc(row?.proof_url||'')}" placeholder="https://..."></label>
-      <label class="wide">ملاحظات<textarea name="notes" maxlength="3000" rows="3">${fEsc(row?.notes||'')}</textarea></label>
-      <label class="finance-check"><input name="is_public" type="checkbox" ${row?.is_public===false?'':'checked'}> إظهار الحركة في تقرير الشفافية العام</label>
-    </div>
-    <div class="finance-form-actions"><button type="submit" class="primary">${editing?'حفظ التعديل':'إضافة الحركة'}</button><span id="financeFormMessage" class="inline-message" role="status"></span></div>
-  </form>`;
-}
-function renderFinance(){
-  const list=financeFilter==='all'?financeRows:financeRows.filter(r=>r.entry_type===financeFilter);
-  f$('#content').innerHTML=`<section class="finance-workspace">
-    <div class="section-head"><div><h3>المركز المالي</h3><p>إدارة الإيرادات والمصروفات وتقارير الشفافية من مكان واحد.</p></div><button class="primary compact" data-finance-new>+ حركة جديدة</button></div>
-    <div class="finance-summary">${fSummary()}</div>
-    <div class="finance-filters">${[['all','الكل'],['income','الإيرادات'],['expense','المصروفات']].map(([v,l])=>`<button data-finance-filter="${v}" class="${financeFilter===v?'active':''}">${l}</button>`).join('')}<span>${list.length} حركة</span></div>
-    <div id="financeFormSlot"></div>
-    ${list.length?`<div class="finance-list">${list.map(row=>`<article class="finance-card" data-finance-id="${fEsc(row.id)}">
-      <header><div><span class="finance-kind ${row.entry_type==='expense'?'expense':'income'}">${row.entry_type==='expense'?'مصروف':'إيراد'}</span><h4>${fEsc(row.title)}</h4></div><strong>${fEsc(fMoney(row.amount,row.currency))}</strong></header>
-      <div class="finance-grid"><div><span>التاريخ</span><b>${fEsc(fDate(row.entry_date))}</b></div><div><span>التصنيف</span><b>${fEsc(row.category||'—')}</b></div><div><span>المشروع</span><b>${fEsc(fProjectName(row.project_id))}</b></div><div><span>المرجع</span><b>${fEsc(row.reference_number||'—')}</b></div><div><span>الظهور</span><b>${row.is_public?'عام':'داخلي'}</b></div><div><span>أنشأها</span><b>${fEsc(row.created_by||'—')}</b></div></div>
-      ${row.notes?`<p class="finance-notes">${fEsc(row.notes)}</p>`:''}
-      <footer>${row.proof_url?`<a class="ghost compact" href="${fEsc(row.proof_url)}" target="_blank" rel="noopener">فتح الإثبات</a>`:'<span></span>'}<div><button class="ghost compact" data-finance-edit>تعديل</button><button class="danger compact" data-finance-delete>حذف</button></div></footer>
-    </article>`).join('')}</div>`:'<div class="empty">لا توجد حركات مالية بهذه الفئة.</div>'}
-  </section>`;
-}
-async function openFinance(){
-  f$('#pageTitle').textContent='المركز المالي';
-  document.querySelectorAll('#adminNav [data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view==='finance'));
-  f$('#sidebar').classList.remove('open');f$('#backdrop').classList.remove('show');f$('#backdrop').hidden=true;
-  f$('#content').innerHTML='<div class="loading">جاري تحميل المركز المالي...</div>';
-  try{
-    const [entries,projects]=await Promise.all([fApi('/api/finance/entries'),fApi('/api/projects')]);
-    financeRows=Array.isArray(entries)?entries:[];financeProjects=Array.isArray(projects)?projects:[];renderFinance();
-  }catch(e){
-    if(e.status===401){sessionStorage.removeItem(F_TOKEN);location.reload();return}
-    f$('#content').innerHTML=`<div class="error">${fEsc(e.message)}</div><button class="ghost" data-finance-retry>إعادة المحاولة</button>`;
-  }
-}
+function fSummary(){const totals=fTotals(financeRows);const currencies=['SDG','SAR','USD'].filter(c=>totals[c]);if(!currencies.length)return '<div class="finance-empty-summary">لا توجد حركات مالية بعد.</div>';return currencies.map(c=>{const t=totals[c],balance=t.income-t.expense;return `<article class="finance-summary-card"><header><strong>${c}</strong></header><div><span>الإيرادات</span><b>${fEsc(fMoney(t.income,c))}</b></div><div><span>المصروفات</span><b>${fEsc(fMoney(t.expense,c))}</b></div><div class="balance"><span>الرصيد</span><b>${fEsc(fMoney(balance,c))}</b></div></article>`}).join('')}
+function fProjectOptions(selected=''){return `<option value="">عام / بدون مشروع</option>${financeProjects.map(p=>`<option value="${fEsc(p.id)}" ${String(selected)===String(p.id)?'selected':''}>${fEsc(p.name)}</option>`).join('')}`}
+function fForm(row=null){const editing=Boolean(row);return `<form id="financeEntryForm" class="finance-form" data-edit-id="${editing?fEsc(row.id):''}"><div class="finance-form-head"><div><h4>${editing?'تعديل حركة مالية':'إضافة حركة مالية'}</h4><p>سجّل الإيراد أو المصروف مع المرجع والإثبات عند الحاجة.</p></div>${editing?'<button type="button" class="ghost compact" data-finance-cancel>إلغاء التعديل</button>':''}</div><div class="finance-form-grid"><label>نوع الحركة<select name="entry_type" required><option value="income" ${row?.entry_type==='income'?'selected':''}>إيراد</option><option value="expense" ${row?.entry_type==='expense'?'selected':''}>مصروف</option></select></label><label>المبلغ<input name="amount" type="number" min="0.01" step="0.01" value="${editing?fEsc(row.amount):''}" required></label><label>العملة<select name="currency" required>${['SDG','SAR','USD'].map(c=>`<option value="${c}" ${row?.currency===c?'selected':''}>${c}</option>`).join('')}</select></label><label>التاريخ<input name="entry_date" type="date" value="${fEsc(row?.entry_date?.slice?.(0,10)||fToday())}" required></label><label class="wide">العنوان<input name="title" maxlength="200" value="${fEsc(row?.title||'')}" required></label><label>التصنيف<input name="category" maxlength="120" value="${fEsc(row?.category||'')}" placeholder="مثال: تبرعات، مواد، ترحيل"></label><label>المشروع<select name="project_id">${fProjectOptions(row?.project_id||'')}</select></label><label>الرقم المرجعي<input name="reference_number" maxlength="160" value="${fEsc(row?.reference_number||'')}" placeholder="رقم إيصال أو تحويل"></label><label class="wide">رابط الإثبات<input name="proof_url" type="url" maxlength="2000" value="${fEsc(row?.proof_url||'')}" placeholder="https://..."></label><label class="wide">ملاحظات<textarea name="notes" maxlength="3000" rows="3">${fEsc(row?.notes||'')}</textarea></label><label class="finance-check"><input name="is_public" type="checkbox" ${row?.is_public===false?'':'checked'}> إظهار الحركة في تقرير الشفافية العام</label></div><div class="finance-form-actions"><button type="submit" class="primary">${editing?'حفظ التعديل':'إضافة الحركة'}</button><span id="financeFormMessage" class="inline-message" role="status"></span></div></form>`}
+function renderFinance(){const list=financeFilter==='all'?financeRows:financeRows.filter(r=>r.entry_type===financeFilter);f$('#content').innerHTML=`<section class="finance-workspace"><div class="section-head"><div><h3>المركز المالي</h3><p>إدارة الإيرادات والمصروفات وتقارير الشفافية من مكان واحد.</p></div><button class="primary compact" data-finance-new>+ حركة جديدة</button></div><div class="finance-summary">${fSummary()}</div><div class="finance-filters">${[['all','الكل'],['income','الإيرادات'],['expense','المصروفات']].map(([v,l])=>`<button data-finance-filter="${v}" class="${financeFilter===v?'active':''}">${l}</button>`).join('')}<span>${list.length} حركة</span></div><div id="financeFormSlot"></div>${list.length?`<div class="finance-list">${list.map(row=>`<article class="finance-card" data-finance-id="${fEsc(row.id)}"><header><div><span class="finance-kind ${row.entry_type==='expense'?'expense':'income'}">${row.entry_type==='expense'?'مصروف':'إيراد'}</span><h4>${fEsc(row.title)}</h4></div><strong>${fEsc(fMoney(row.amount,row.currency))}</strong></header><div class="finance-grid"><div><span>التاريخ</span><b>${fEsc(fDate(row.entry_date))}</b></div><div><span>التصنيف</span><b>${fEsc(row.category||'—')}</b></div><div><span>المشروع</span><b>${fEsc(fProjectName(row.project_id))}</b></div><div><span>المرجع</span><b>${fEsc(row.reference_number||'—')}</b></div><div><span>الظهور</span><b>${row.is_public?'عام':'داخلي'}</b></div><div><span>أنشأها</span><b>${fEsc(row.created_by||'—')}</b></div></div>${row.notes?`<p class="finance-notes">${fEsc(row.notes)}</p>`:''}<footer>${row.proof_url?`<a class="ghost compact" href="${fEsc(row.proof_url)}" target="_blank" rel="noopener">فتح الإثبات</a>`:'<span></span>'}<div><button class="ghost compact" data-finance-edit>تعديل</button><button class="danger compact" data-finance-delete>حذف</button></div></footer></article>`).join('')}</div>`:'<div class="empty">لا توجد حركات مالية بهذه الفئة.</div>'}</section>`}
+async function openFinance(){f$('#pageTitle').textContent='المركز المالي';document.querySelectorAll('#adminNav [data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view==='finance'));f$('#sidebar').classList.remove('open');f$('#backdrop').classList.remove('show');f$('#backdrop').hidden=true;f$('#content').innerHTML='<div class="loading">جاري تحميل المركز المالي...</div>';try{const [entries,projects]=await Promise.all([fApi('/api/v2/finance/entries'),fApi('/api/projects')]);financeRows=Array.isArray(entries)?entries:[];financeProjects=Array.isArray(projects)?projects:[];renderFinance()}catch(e){if(e.status===401){sessionStorage.removeItem(F_TOKEN);location.reload();return}f$('#content').innerHTML=`<div class="error">${fEsc(e.message)}</div><button class="ghost" data-finance-retry>إعادة المحاولة</button>`}}
 function showFinanceForm(row=null){const slot=f$('#financeFormSlot');if(slot){slot.innerHTML=fForm(row);slot.scrollIntoView({behavior:'smooth',block:'start'})}}
-async function saveFinanceForm(form){
-  const message=f$('#financeFormMessage'),button=form.querySelector('button[type="submit"]');
-  const data=Object.fromEntries(new FormData(form).entries());
-  data.amount=Number(data.amount);data.is_public=form.elements.is_public.checked;
-  data.project_id=data.project_id?Number(data.project_id):null;
-  for(const key of ['category','reference_number','proof_url','notes'])if(!data[key])data[key]=null;
-  try{
-    button.disabled=true;message.textContent='جاري الحفظ...';
-    const id=form.dataset.editId;
-    await fApi(id?`/api/finance/entries/${id}`:'/api/finance/entries',{method:id?'PATCH':'POST',body:data});
-    await openFinance();
-  }catch(e){message.textContent=e.message;button.disabled=false}
-}
-async function deleteFinance(card){
-  const row=financeRows.find(r=>String(r.id)===String(card.dataset.financeId));
-  if(!row||!confirm(`حذف الحركة: ${row.title}؟ لا يمكن التراجع عن هذا الإجراء.`))return;
-  const button=card.querySelector('[data-finance-delete]');
-  try{button.disabled=true;await fApi(`/api/finance/entries/${row.id}`,{method:'DELETE'});await openFinance()}catch(e){alert(e.message);button.disabled=false}
-}
-
+async function saveFinanceForm(form){const message=f$('#financeFormMessage'),button=form.querySelector('button[type="submit"]');const data=Object.fromEntries(new FormData(form).entries());data.amount=Number(data.amount);data.is_public=form.elements.is_public.checked;data.project_id=data.project_id||null;for(const key of ['category','reference_number','proof_url','notes'])if(!data[key])data[key]=null;try{button.disabled=true;message.textContent='جاري الحفظ...';const id=form.dataset.editId;await fApi(id?`/api/v2/finance/entries/${id}`:'/api/v2/finance/entries',{method:id?'PATCH':'POST',body:data});await openFinance()}catch(e){message.textContent=e.message;button.disabled=false}}
+async function deleteFinance(card){const row=financeRows.find(r=>String(r.id)===String(card.dataset.financeId));if(!row||!confirm(`حذف الحركة: ${row.title}؟ لا يمكن التراجع عن هذا الإجراء.`))return;const button=card.querySelector('[data-finance-delete]');try{button.disabled=true;await fApi(`/api/v2/finance/entries/${row.id}`,{method:'DELETE'});await openFinance()}catch(e){alert(e.message);button.disabled=false}}
 document.addEventListener('submit',async e=>{if(e.target.id!=='financeEntryForm')return;e.preventDefault();await saveFinanceForm(e.target)},true);
-document.addEventListener('click',async e=>{
-  const nav=e.target.closest('#adminNav [data-view="finance"]');if(nav){e.preventDefault();e.stopImmediatePropagation();await openFinance();return}
-  const filter=e.target.closest('[data-finance-filter]');if(filter){financeFilter=filter.dataset.financeFilter;renderFinance();return}
-  if(e.target.closest('[data-finance-new]')){showFinanceForm();return}
-  if(e.target.closest('[data-finance-cancel]')){const slot=f$('#financeFormSlot');if(slot)slot.innerHTML='';return}
-  if(e.target.closest('[data-finance-retry]')){await openFinance();return}
-  const edit=e.target.closest('[data-finance-edit]');if(edit){const card=edit.closest('.finance-card'),row=financeRows.find(r=>String(r.id)===String(card.dataset.financeId));showFinanceForm(row);return}
-  const del=e.target.closest('[data-finance-delete]');if(del){await deleteFinance(del.closest('.finance-card'))}
-},true);
+document.addEventListener('click',async e=>{const nav=e.target.closest('#adminNav [data-view="finance"]');if(nav){e.preventDefault();e.stopImmediatePropagation();await openFinance();return}const filter=e.target.closest('[data-finance-filter]');if(filter){financeFilter=filter.dataset.financeFilter;renderFinance();return}if(e.target.closest('[data-finance-new]')){showFinanceForm();return}if(e.target.closest('[data-finance-cancel]')){const slot=f$('#financeFormSlot');if(slot)slot.innerHTML='';return}if(e.target.closest('[data-finance-retry]')){await openFinance();return}const edit=e.target.closest('[data-finance-edit]');if(edit){const card=edit.closest('.finance-card'),row=financeRows.find(r=>String(r.id)===String(card.dataset.financeId));showFinanceForm(row);return}const del=e.target.closest('[data-finance-delete]');if(del){await deleteFinance(del.closest('.finance-card'))}},true);
