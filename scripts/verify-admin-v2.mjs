@@ -43,10 +43,10 @@ for(const behavior of ['summarize','renderAudit','data-view="audit"'])if(!auditJ
 for(const route of ['/api/admin/backup/status','/api/admin/backup/export','/api/admin/backup/import']){if(!backupJs.includes(route))throw new Error(`Backup workspace missing route: ${route}`);if(!bootstrapV2.includes(route))throw new Error(`Backup backend missing route: ${route}`)}
 for(const guard of ['RESTORE_BUNYAN','adminOnly','BEGIN','ROLLBACK','COMMIT'])if(!bootstrapV2.includes(guard))throw new Error(`Backup restore guard missing: ${guard}`);
 if(!packageJson.includes('src/bootstrap-v2.js'))throw new Error('Backend start script must use bootstrap-v2.js');
-if(!settingsJs.includes('/api/admin/settings'))throw new Error('Settings workspace missing route: /api/admin/settings');
-for(const signature of ["app.get('/api/admin/settings',auth,adminOnly","app.patch('/api/admin/settings',auth,adminOnly","app.get('/api/dashboard/insights',auth"])if(!bootstrapV2.includes(signature))throw new Error(`Missing V2 API contract: ${signature}`);
+if(!settingsJs.includes('/api/v2/admin/settings'))throw new Error('Settings workspace missing route: /api/v2/admin/settings');
+for(const signature of ["app.get('/api/v2/admin/settings',auth,adminOnly","app.patch('/api/v2/admin/settings',auth,adminOnly","app.get('/api/dashboard/insights',auth"])if(!bootstrapV2.includes(signature))throw new Error(`Missing V2 API contract: ${signature}`);
 if(!bootstrapV2.includes('CREATE TABLE IF NOT EXISTS system_settings'))throw new Error('System settings storage is missing');
-for(const marker of ['/api/admin/backup/import','/api/v2/finance/entries','Finance project UUID was not preserved'])if(!previewSmoke.includes(marker))throw new Error(`Preview smoke coverage missing: ${marker}`);
+for(const marker of ['/api/admin/backup/import','/api/v2/finance/entries','/api/v2/admin/settings','Finance project UUID was not preserved'])if(!previewSmoke.includes(marker))throw new Error(`Preview smoke coverage missing: ${marker}`);
 const requiredBehaviors=['sessionStorage.setItem','sessionStorage.removeItem','AbortController',"addEventListener('submit'", "addEventListener('click'"];
 for(const behavior of requiredBehaviors)if(!js.includes(behavior))throw new Error(`Missing behavior: ${behavior}`);
 const productionOrigin=process.env.BUNYAN_SMOKE_ORIGIN||'https://api.bunyan-sudan.org';
