@@ -4,8 +4,10 @@
   const nav=document.getElementById('nav');
   if(!menu||!nav)return;
 
-  let lastMenuTap=0;
-  const TAP_GUARD_MS=550;
+  const adminDashboardOpen=()=>{
+    const dash=document.getElementById('dash');
+    return Boolean(dash&&(dash.classList.contains('open')||dash.classList.contains('show')));
+  };
 
   const setOpen=open=>{
     nav.classList.toggle('open',open);
@@ -19,12 +21,23 @@
   menu.setAttribute('aria-controls','nav');
   menu.setAttribute('aria-expanded','false');
 
+  let lastMenuClick=0;
   menu.addEventListener('click',e=>{
+    // When the legacy admin dashboard is open, this button belongs exclusively
+    // to admin-navigation-final.js. Do not consume the event here.
+    if(adminDashboardOpen()){
+      setOpen(false);
+      return;
+    }
+    const now=Date.now();
+    if(now-lastMenuClick<450){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      return;
+    }
+    lastMenuClick=now;
     e.preventDefault();
     e.stopImmediatePropagation();
-    const now=performance.now();
-    if(now-lastMenuTap<TAP_GUARD_MS)return;
-    lastMenuTap=now;
     setOpen(!nav.classList.contains('open'));
   },true);
 
@@ -56,8 +69,8 @@
     link.setAttribute('aria-current',active?'true':'false');
   });
 
-  window.addEventListener('bunyan:languagechange',()=>setOpen(nav.classList.contains('open')));
-  if(sessionStorage.getItem('bunyan_keep_menu_open')==='1'){
+  window.addEventListener('bunyan:languagechange',()=>setOpen(adminDashboardOpen()?false:nav.classList.contains('open')));
+  if(sessionStorage.getItem('bunyan_keep_menu_open')==='1'&&!adminDashboardOpen()){
     sessionStorage.removeItem('bunyan_keep_menu_open');
     setOpen(true);
   }else setOpen(false);
