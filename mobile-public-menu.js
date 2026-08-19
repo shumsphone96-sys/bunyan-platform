@@ -4,6 +4,9 @@
   const nav=document.getElementById('nav');
   if(!menu||!nav)return;
 
+  let lastMenuTap=0;
+  const TAP_GUARD_MS=550;
+
   const setOpen=open=>{
     nav.classList.toggle('open',open);
     document.body.classList.toggle('menu-open',open);
@@ -19,6 +22,9 @@
   menu.addEventListener('click',e=>{
     e.preventDefault();
     e.stopImmediatePropagation();
+    const now=performance.now();
+    if(now-lastMenuTap<TAP_GUARD_MS)return;
+    lastMenuTap=now;
     setOpen(!nav.classList.contains('open'));
   },true);
 
