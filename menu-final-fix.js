@@ -4,6 +4,11 @@
   const nav=document.getElementById('nav');
   if(!menu||!nav)return;
 
+  const adminDashboardOpen=()=>{
+    const dash=document.getElementById('dash');
+    return Boolean(dash&&(dash.classList.contains('open')||dash.classList.contains('show')));
+  };
+
   const readLanguage=()=>{
     const q=new URLSearchParams(location.search).get('lang');
     if(q==='en'||q==='ar')return q;
@@ -76,11 +81,17 @@
   };
   menu.setAttribute('aria-controls','nav');
   menu.setAttribute('aria-expanded','false');
-  menu.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();setOpen(!nav.classList.contains('open'));},true);
+  menu.addEventListener('click',e=>{
+    if(adminDashboardOpen()){
+      setOpen(false);
+      return;
+    }
+    e.preventDefault();e.stopImmediatePropagation();setOpen(!nav.classList.contains('open'));
+  },true);
   nav.addEventListener('click',e=>{if(e.target.closest('a:not([data-lang-link]),#adminBtn'))setOpen(false);},true);
   document.addEventListener('click',e=>{if(nav.classList.contains('open')&&!nav.contains(e.target)&&!menu.contains(e.target))setOpen(false);});
   document.addEventListener('keydown',e=>{if(e.key==='Escape')setOpen(false);});
-  if(sessionStorage.getItem('bunyan_menu_reopen')==='1'){
+  if(sessionStorage.getItem('bunyan_menu_reopen')==='1'&&!adminDashboardOpen()){
     sessionStorage.removeItem('bunyan_menu_reopen');setTimeout(()=>setOpen(true),80);
   }else setOpen(false);
 })();
