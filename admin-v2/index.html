@@ -4,20 +4,23 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#071a17">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>بُنْيَان OS — الإدارة V2</title>
-  <link rel="stylesheet" href="./styles.css">
-  <link rel="stylesheet" href="./runtime.css">
-  <link rel="stylesheet" href="./help.css">
-  <link rel="stylesheet" href="./donations.css">
-  <link rel="stylesheet" href="./projects.css">
-  <link rel="stylesheet" href="./beneficiaries.css">
-  <link rel="stylesheet" href="./volunteers.css">
-  <link rel="stylesheet" href="./finance.css">
-  <link rel="stylesheet" href="./news.css">
-  <link rel="stylesheet" href="./users.css">
-  <link rel="stylesheet" href="./audit.css">
-  <link rel="stylesheet" href="./backup.css">
-  <link rel="stylesheet" href="./settings.css">
+  <link rel="stylesheet" href="./styles.css?v=20260820-fast-login-1">
+  <link rel="stylesheet" href="./runtime.css?v=20260820-fast-login-1">
+  <link rel="stylesheet" href="./help.css?v=20260820-fast-login-1">
+  <link rel="stylesheet" href="./donations.css?v=20260820-fast-login-1">
+  <link rel="stylesheet" href="./projects.css?v=20260820-fast-login-1">
+  <link rel="stylesheet" href="./beneficiaries.css?v=20260820-fast-login-1">
+  <link rel="stylesheet" href="./volunteers.css?v=20260820-fast-login-1">
+  <link rel="stylesheet" href="./finance.css?v=20260820-fast-login-1">
+  <link rel="stylesheet" href="./news.css?v=20260820-fast-login-1">
+  <link rel="stylesheet" href="./users.css?v=20260820-fast-login-1">
+  <link rel="stylesheet" href="./audit.css?v=20260820-fast-login-1">
+  <link rel="stylesheet" href="./backup.css?v=20260820-fast-login-1">
+  <link rel="stylesheet" href="./settings.css?v=20260820-fast-login-1">
 </head>
 <body>
   <section id="loginView" class="auth-view">
@@ -25,8 +28,8 @@
       <div class="brand-mark">ب</div><p class="eyebrow">بُنْيَان OS</p><h1>دخول الإدارة</h1>
       <label>البريد الإلكتروني<input name="email" type="email" autocomplete="username" required></label>
       <label>كلمة المرور<input name="password" type="password" autocomplete="current-password" minlength="10" required></label>
-      <button class="primary" type="submit" disabled>انتظر تجهيز الخادم…</button>
-      <p id="loginMessage" class="message" role="status">جاري إيقاظ الخادم الآمن…</p>
+      <button class="primary" type="submit">دخول</button>
+      <p id="loginMessage" class="message" role="status">جاهز لتسجيل الدخول.</p>
     </form>
   </section>
   <section id="appView" class="app" hidden>
@@ -46,19 +49,19 @@
     <main class="main"><header class="topbar"><button id="menuButton" class="menu-button" aria-label="فتح قائمة الإدارة">☰</button><div><p class="eyebrow">لوحة الإدارة المستقلة</p><h2 id="pageTitle">نظرة عامة</h2></div><button id="refreshButton" class="ghost">تحديث</button></header><div id="content" class="content" aria-live="polite"></div></main>
     <button id="backdrop" class="backdrop" aria-label="إغلاق القائمة" hidden></button>
   </section>
-  <script>(()=>{const form=document.getElementById('loginForm'),button=form.querySelector('button[type="submit"]'),message=document.getElementById('loginMessage'),controller=new AbortController(),timer=setTimeout(()=>controller.abort(),90000);fetch('https://api.bunyan-sudan.org/health',{cache:'no-store',signal:controller.signal}).then(r=>{if(!r.ok)throw new Error('health');return r.json()}).then(data=>{if(!data?.ok)throw new Error('health');message.textContent='الخادم جاهز. يمكنك تسجيل الدخول الآن.'}).catch(()=>{message.textContent='لم نتأكد من جاهزية الخادم، لكن يمكنك المحاولة الآن.'}).finally(()=>{clearTimeout(timer);button.disabled=false;button.textContent='دخول'})})();</script>
-  <script type="module" src="./app.js"></script>
-  <script type="module" src="./help.js"></script>
-  <script type="module" src="./participation.js"></script>
-  <script type="module" src="./donations.js"></script>
-  <script type="module" src="./projects.js"></script>
-  <script type="module" src="./beneficiaries.js"></script>
-  <script type="module" src="./volunteers.js"></script>
-  <script type="module" src="./finance.js"></script>
-  <script type="module" src="./news.js"></script>
-  <script type="module" src="./users.js"></script>
-  <script type="module" src="./audit.js"></script>
-  <script type="module" src="./backup.js"></script>
-  <script type="module" src="./settings.js"></script>
+  <script src="./login-fast.js?v=20260820-fast-login-1"></script>
+  <script type="module" src="./app.js?v=20260820-fast-login-1"></script>
+  <script type="module" src="./help.js?v=20260820-fast-login-1"></script>
+  <script type="module" src="./participation.js?v=20260820-fast-login-1"></script>
+  <script type="module" src="./donations.js?v=20260820-fast-login-1"></script>
+  <script type="module" src="./projects.js?v=20260820-fast-login-1"></script>
+  <script type="module" src="./beneficiaries.js?v=20260820-fast-login-1"></script>
+  <script type="module" src="./volunteers.js?v=20260820-fast-login-1"></script>
+  <script type="module" src="./finance.js?v=20260820-fast-login-1"></script>
+  <script type="module" src="./news.js?v=20260820-fast-login-1"></script>
+  <script type="module" src="./users.js?v=20260820-fast-login-1"></script>
+  <script type="module" src="./audit.js?v=20260820-fast-login-1"></script>
+  <script type="module" src="./backup.js?v=20260820-fast-login-1"></script>
+  <script type="module" src="./settings.js?v=20260820-fast-login-1"></script>
 </body>
 </html>
