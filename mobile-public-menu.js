@@ -4,6 +4,11 @@
   const nav=document.getElementById('nav');
   if(!menu||!nav)return;
 
+  const adminIsOpen=()=>{
+    const dash=document.getElementById('dash');
+    return !!dash&&(dash.classList.contains('open')||dash.classList.contains('show'));
+  };
+
   const setOpen=open=>{
     nav.classList.toggle('open',open);
     document.body.classList.toggle('menu-open',open);
@@ -17,6 +22,7 @@
   menu.setAttribute('aria-expanded','false');
 
   menu.addEventListener('click',e=>{
+    if(adminIsOpen())return;
     e.preventDefault();
     e.stopImmediatePropagation();
     setOpen(!nav.classList.contains('open'));
@@ -32,6 +38,7 @@
   });
 
   document.addEventListener('click',e=>{
+    if(adminIsOpen())return;
     if(nav.classList.contains('open')&&!nav.contains(e.target)&&!menu.contains(e.target))setOpen(false);
   });
 
