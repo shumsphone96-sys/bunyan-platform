@@ -3,7 +3,7 @@
 
   const official='https://api.bunyan-sudan.org';
   const render='https://bunyan-api-qhkf.onrender.com';
-  const release='20260819-admin-mobile-drawer-fix-2';
+  const release='20260820-root-login-fast-1';
 
   window.BUNYAN_API_ORIGINS=[official,render];
   window.BUNYAN_API_ORIGIN=official;
@@ -76,6 +76,7 @@
     await loadScript('stability-v1.js','stability-v1-last');
     await loadScript('admin-navigation-final.js','admin-navigation-final-last');
     await loadScript('admin-entry-final.js','admin-entry-final-last');
+    await loadScript('login-root-fast.js','login-root-fast-last');
     reveal();
     window.dispatchEvent(new CustomEvent('bunyan:ready',{detail:{release}}));
     setTimeout(()=>{
