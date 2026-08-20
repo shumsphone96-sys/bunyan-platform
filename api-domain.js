@@ -3,7 +3,7 @@
 
   const official='https://api.bunyan-sudan.org';
   const render='https://bunyan-api-qhkf.onrender.com';
-  const release='20260801-visible-failsafe-4';
+  const release='20260820-rebuild-v2-login-fast-1';
 
   window.BUNYAN_API_ORIGINS=[official,render];
   window.BUNYAN_API_ORIGIN=official;
@@ -54,6 +54,7 @@
   ].forEach(([file,key])=>loadStyle(file,key));
 
   const modules=[
+    ['public-login-fast.js','public-login-fast'],
     ['language-native-router.js','language-native-router'],
     ['i18n-bindings.js','i18n-bindings'],
     ['i18n-keyed.js','i18n-keyed'],
