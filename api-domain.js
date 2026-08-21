@@ -3,7 +3,7 @@
 
   const official='https://api.bunyan-sudan.org';
   const render='https://bunyan-api-qhkf.onrender.com';
-  const release='20260820-rebuild-v2-admin-menu-fix-2';
+  const release='20260821-admin-drawer-force-1';
 
   window.BUNYAN_API_ORIGINS=[official,render];
   window.BUNYAN_API_ORIGIN=official;
@@ -77,6 +77,7 @@
     await loadScript('stability-v1.js','stability-v1-last');
     await loadScript('admin-navigation-final.js','admin-navigation-final-last');
     await loadScript('admin-entry-final.js','admin-entry-final-last');
+    await loadScript('admin-drawer-force.js','admin-drawer-force-last');
     reveal();
     window.dispatchEvent(new CustomEvent('bunyan:ready',{detail:{release}}));
     setTimeout(()=>{
@@ -84,6 +85,7 @@
       const title=document.getElementById('dashTitle');
       if(dash?.classList.contains('open')&&title?.textContent?.trim()==='نظرة عامة')window.openExecutiveDashboard?.();
       window.BunyanAdminEntryFinal?.install?.();
+      window.BunyanAdminDrawerForce?.install?.();
       window.BunyanStability?.run?.();
       reveal();
     },900);
