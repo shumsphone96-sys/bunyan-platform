@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "wadnofei-membership",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "APP_NAME": "نادي ود نفيع الرياضي الثقافي الاجتماعي",
+    "APP_ORIGIN": "https://members.shamsphone.net"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "wadnofei-membership",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID"
+    }
+  ]
+}
