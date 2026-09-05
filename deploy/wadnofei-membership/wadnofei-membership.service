@@ -1,0 +1,12 @@
+[Unit]
+Description=Wad Nofei Membership
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/wadnofei-membership
+Environment=SECRET_KEY=replace-this-with-a-long-random-secret
+ExecStart=/opt/wadnofei-membership/venv/bin/gunicorn -w 2 -b 127.0.0.1:8010 app:app
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
