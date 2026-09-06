@@ -11,8 +11,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "wadnofei-membership",
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID"
+      "database_name": "wadnofei-membership-db",
+      "database_id": "39725aeb-ec00-4ae2-b7ef-1c68cce00f1d"
     }
   ]
 }
