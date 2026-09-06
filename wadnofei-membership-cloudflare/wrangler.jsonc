@@ -6,7 +6,11 @@
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
     "APP_NAME": "نادي ود نفيع الرياضي الثقافي الاجتماعي",
-    "APP_ORIGIN": "https://members.shamsphone.net"
+    "APP_ORIGIN": "https://members.shamsphone.net",
+    "WHATSAPP_PHONE_NUMBER_ID": "1281531978380444",
+    "WHATSAPP_BUSINESS_ACCOUNT_ID": "1880425336271578",
+    "WHATSAPP_TEST_RECIPIENT": "249912930540",
+    "WHATSAPP_MODE": "meta_test"
   },
   "d1_databases": [
     {
