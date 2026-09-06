@@ -1,0 +1,67 @@
+import app from './worker-global-v12.js';
+
+const CLUB='نادي ود نفيع الرياضي الثقافي الاجتماعي';
+const G='#d5a928',B='#0a347c',D='#061a43';
+
+export default {async fetch(req,env,ctx){
+  const u=new URL(req.url),p=u.pathname.replace(/\/$/,'')||'/',m=req.method;
+  if(env.DB) await init(env.DB);
+
+  if(p.startsWith('/club-admin/')){
+    const a=env.DB?await admin(req,env.DB):null;
+    if(!a) return red('/login');
+    if(p==='/club-admin/subscriptions') return m==='POST'?addSubscription(req,env.DB,a):subscriptions(env.DB);
+    if(p==='/club-admin/attendance') return m==='POST'?addAttendance(req,env.DB,a):attendance(env.DB);
+    if(p==='/club-admin/correspondence') return m==='POST'?addCorrespondence(req,env.DB,a):correspondence(env.DB);
+    if(p==='/club-admin/task-status'&&m==='POST') return taskStatus(req,env.DB,a);
+    if(p==='/club-admin/executive-summary') return executiveSummary(env.DB);
+  }
+
+  let r=await app.fetch(req,env,ctx);
+  const ct=r.headers.get('content-type')||'';
+  if(req.method==='GET'&&ct.includes('text/html')){
+    let t=await r.text();
+    if(p==='/club-admin'){
+      let overdue=0,upcoming=0,subs=0;
+      try{overdue=Number((await env.DB.prepare(`SELECT COUNT(*) n FROM club_tasks WHERE COALESCE(status,'open') NOT IN ('done','completed','مكتملة') AND due_date<>'' AND date(due_date)<date('now')`).first())?.n||0)}catch(_){}
+      try{upcoming=Number((await env.DB.prepare(`SELECT COUNT(*) n FROM club_meetings WHERE meeting_date<>'' AND date(meeting_date)>=date('now') AND date(meeting_date)<=date('now','+14 day')`).first())?.n||0)}catch(_){}
+      try{subs=Number((await env.DB.prepare(`SELECT COALESCE(SUM(amount),0) n FROM club_subscriptions WHERE date(created_at)>=date('now','start of month')`).first())?.n||0)}catch(_){}
+      const ops=`<section class="v13box"><div class="v13head"><div><span>لوحة المتابعة التنفيذية</span><h2>ما يحتاج انتباه الإدارة الآن</h2></div><a class="v13report" href="/club-admin/executive-summary">عرض الملخص التنفيذي</a></div><div class="v13stats"><div><b>${overdue}</b><span>مهام متأخرة</span></div><div><b>${upcoming}</b><span>اجتماعات خلال 14 يوم</span></div><div><b>${money(subs)}</b><span>اشتراكات هذا الشهر</span></div></div><div class="v13grid"><a href="/club-admin/subscriptions">💳 الاشتراكات والتحصيل</a><a href="/club-admin/attendance">🧾 الحضور والغياب</a><a href="/club-admin/correspondence">✉️ الصادر والوارد</a></div></section>`;
+      t=t.replace('</main>',ops+'</main>');
+    }
+    const css=`<style>.v13box{margin:24px 0;padding:20px;border:1px solid ${G}88;border-radius:24px;background:linear-gradient(145deg,#08265ddd,#0a347ccc)}.v13head{display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap}.v13head span{color:#9ebcff;font-weight:900}.v13head h2{margin:4px 0 0;color:${G}}.v13report{background:${G};color:${D}!important;text-decoration:none;padding:11px 14px;border-radius:12px;font-weight:900}.v13stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0}.v13stats div{background:#061a4388;border:1px solid #d5a92855;border-radius:16px;padding:15px;text-align:center}.v13stats b{display:block;color:#ffd65b;font-size:1.6rem}.v13stats span{opacity:.86}.v13grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.v13grid a{display:block;text-decoration:none;color:white;background:#0d3b86;border:1px solid #d5a92866;padding:16px;border-radius:16px;font-weight:900}.v13grid a:hover{background:#134899}.badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#ffffff18;border:1px solid #ffffff24;font-size:.8rem}.row-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.mini-btn{border:0;border-radius:9px;padding:7px 10px;background:${G};color:${D};font-weight:900}@media(max-width:700px){.v13stats,.v13grid{grid-template-columns:1fr}.v13head{align-items:flex-start}}</style>`;
+    t=t.replace('</head>',css+'</head>');
+    const h=new Headers(r.headers);h.delete('content-length');h.set('cache-control','no-store');h.set('x-wadnofei-ui','v13');
+    return new Response(t,{status:r.status,statusText:r.statusText,headers:h});
+  }
+  return r;
+}};
+
+async function init(db){for(const q of [
+`CREATE TABLE IF NOT EXISTS club_subscriptions(id INTEGER PRIMARY KEY AUTOINCREMENT,member_name TEXT NOT NULL,member_no TEXT,period TEXT,amount REAL DEFAULT 0,payment_method TEXT,receipt_no TEXT,notes TEXT,created_at TEXT DEFAULT CURRENT_TIMESTAMP)`,
+`CREATE TABLE IF NOT EXISTS club_attendance(id INTEGER PRIMARY KEY AUTOINCREMENT,event_type TEXT,event_title TEXT,person_name TEXT NOT NULL,status TEXT DEFAULT 'present',event_date TEXT,notes TEXT,created_at TEXT DEFAULT CURRENT_TIMESTAMP)`,
+`CREATE TABLE IF NOT EXISTS club_correspondence(id INTEGER PRIMARY KEY AUTOINCREMENT,direction TEXT NOT NULL,ref_no TEXT,subject TEXT NOT NULL,party TEXT,doc_date TEXT,status TEXT DEFAULT 'open',notes TEXT,created_at TEXT DEFAULT CURRENT_TIMESTAMP)`]){try{await db.prepare(q).run()}catch(_){}}}
+
+async function admin(req,db){let c=req.headers.get('Cookie')||'',x=c.match(/(?:^|;\s*)sid=([^;]+)/);if(!x)return null;return db.prepare(`SELECT a.id,a.username,COALESCE(a.role,'owner') role FROM sessions s JOIN admins a ON a.id=s.admin_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(decodeURIComponent(x[1])).first()}
+async function log(db,a,action,target){try{await db.prepare(`INSERT INTO audit_log(admin_id,username,role,action,target_type,created_at) VALUES(?,?,?,?,?,CURRENT_TIMESTAMP)`).bind(a.id,a.username,a.role,action,target).run()}catch(_){}}
+
+async function subscriptions(db){let r=await db.prepare('SELECT * FROM club_subscriptions ORDER BY id DESC LIMIT 600').all();let total=0;try{total=Number((await db.prepare('SELECT COALESCE(SUM(amount),0) n FROM club_subscriptions').first())?.n||0)}catch(_){}return H(page('الاشتراكات والتحصيل',`<div class="summary"><b>إجمالي الاشتراكات المسجلة: ${money(total)} جنيه</b></div>`+form('/club-admin/subscriptions',[['اسم العضو','member_name',1],['رقم العضوية','member_no'],['الفترة/الشهر','period'],['المبلغ','amount',1],['طريقة الدفع','payment_method'],['رقم الإيصال','receipt_no'],['ملاحظات','notes']],'تسجيل التحصيل')+cards(r.results,x=>`<b>${e(x.member_name)} — ${money(x.amount)} جنيه</b><span>${e(x.period||'—')} · ${e(x.payment_method||'')}</span><small>${e(x.member_no||'')} ${x.receipt_no?'· إيصال '+e(x.receipt_no):''}</small>`))}
+async function addSubscription(req,db,a){let f=await req.formData();await db.prepare('INSERT INTO club_subscriptions(member_name,member_no,period,amount,payment_method,receipt_no,notes) VALUES(?,?,?,?,?,?,?)').bind(v(f,'member_name'),v(f,'member_no'),v(f,'period'),Number(v(f,'amount')||0),v(f,'payment_method'),v(f,'receipt_no'),v(f,'notes')).run();await log(db,a,'add_subscription','subscription');return red('/club-admin/subscriptions')}
+
+async function attendance(db){let r=await db.prepare('SELECT * FROM club_attendance ORDER BY id DESC LIMIT 800').all();return H(page('الحضور والغياب',form('/club-admin/attendance',[['نوع المناسبة','event_type'],['اسم المناسبة/الاجتماع','event_title'],['الاسم','person_name',1],['الحالة (حاضر/غائب/معتذر)','status'],['التاريخ','event_date'],['ملاحظات','notes']],'حفظ الحضور')+cards(r.results,x=>`<b>${e(x.person_name)} <span class="badge">${e(x.status||'present')}</span></b><span>${e(x.event_title||x.event_type||'—')} · ${e(x.event_date||'')}</span><small>${e(x.notes||'')}</small>`))}
+async function addAttendance(req,db,a){let f=await req.formData();await db.prepare('INSERT INTO club_attendance(event_type,event_title,person_name,status,event_date,notes) VALUES(?,?,?,?,?,?)').bind(v(f,'event_type'),v(f,'event_title'),v(f,'person_name'),v(f,'status')||'present',v(f,'event_date'),v(f,'notes')).run();await log(db,a,'add_attendance','attendance');return red('/club-admin/attendance')}
+
+async function correspondence(db){let r=await db.prepare('SELECT * FROM club_correspondence ORDER BY id DESC LIMIT 600').all();return H(page('الصادر والوارد',form('/club-admin/correspondence',[['الاتجاه (صادر/وارد)','direction',1],['رقم الخطاب','ref_no'],['الموضوع','subject',1],['الجهة','party'],['التاريخ','doc_date'],['الحالة','status'],['ملاحظات','notes']],'حفظ الخطاب')+cards(r.results,x=>`<b>${e(x.direction)} · ${e(x.subject)}</b><span>${e(x.party||'—')} ${x.ref_no?'· '+e(x.ref_no):''}</span><small>${e(x.doc_date||'')} · ${e(x.status||'open')} ${e(x.notes||'')}</small>`))}
+async function addCorrespondence(req,db,a){let f=await req.formData();await db.prepare('INSERT INTO club_correspondence(direction,ref_no,subject,party,doc_date,status,notes) VALUES(?,?,?,?,?,?,?)').bind(v(f,'direction'),v(f,'ref_no'),v(f,'subject'),v(f,'party'),v(f,'doc_date'),v(f,'status')||'open',v(f,'notes')).run();await log(db,a,'add_correspondence','correspondence');return red('/club-admin/correspondence')}
+
+async function taskStatus(req,db,a){let f=await req.formData(),id=Number(v(f,'id')||0),s=v(f,'status')||'done';if(id>0){await db.prepare('UPDATE club_tasks SET status=? WHERE id=?').bind(s,id).run();await log(db,a,'update_task_status','task')}return red('/club-admin/tasks')}
+
+async function executiveSummary(db){let [tasks,meetings,subs,corr]=await Promise.all([safeAll(db,`SELECT * FROM club_tasks ORDER BY CASE status WHEN 'open' THEN 0 ELSE 1 END,id DESC LIMIT 20`),safeAll(db,`SELECT * FROM club_meetings ORDER BY id DESC LIMIT 10`),safeAll(db,`SELECT * FROM club_subscriptions ORDER BY id DESC LIMIT 15`),safeAll(db,`SELECT * FROM club_correspondence ORDER BY id DESC LIMIT 15`)]);let body=`<section class="report"><h2>المهام</h2>${cards(tasks,x=>`<b>${e(x.title)}</b><span>${e(x.assigned_to||'—')} · ${e(x.due_date||'')}</span><small>${e(x.status||'')}</small>`)}<h2>آخر الاجتماعات</h2>${cards(meetings,x=>`<b>${e(x.title)}</b><span>${e(x.meeting_date||'—')}</span><small>${e(x.decisions||x.agenda||'')}</small>`)}<h2>آخر الاشتراكات</h2>${cards(subs,x=>`<b>${e(x.member_name)} — ${money(x.amount)} جنيه</b><span>${e(x.period||'')}</span>`)}<h2>آخر الصادر والوارد</h2>${cards(corr,x=>`<b>${e(x.direction)} · ${e(x.subject)}</b><span>${e(x.party||'—')} · ${e(x.doc_date||'')}</span>`)}</section><div class="printbar"><button onclick="print()">طباعة الملخص التنفيذي</button></div>`;return H(page('الملخص التنفيذي',body))}
+
+async function safeAll(db,q){try{return (await db.prepare(q).all()).results||[]}catch(_){return []}}
+function page(t,b){return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="${D}"><title>${e(t)} · ${CLUB}</title><style>${css()}</style></head><body><header><b>${CLUB}</b><nav><a href="/club-admin">المركز</a><a href="/applications">العضوية</a><a href="/members">الأعضاء</a><a href="/reports">التقارير</a></nav></header><main><h1>${e(t)}</h1>${b}</main><footer>نادي ود نفيع · تأسس عام 1964</footer></body></html>`}
+function form(action,fields,button){return `<form class="form" method="post" action="${action}">${fields.map(([l,n,r])=>`<label>${l}<input name="${n}" ${r?'required':''}></label>`).join('')}<button>${button}</button></form>`}
+function cards(a,fn){return `<div class="list">${a.length?a.map(x=>`<article>${fn(x)}</article>`).join(''):'<article>لا توجد بيانات حتى الآن.</article>'}</div>`}
+function css(){return `*{box-sizing:border-box}body{margin:0;background:linear-gradient(160deg,${D},${B});color:white;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,Arial;min-height:100vh}header{background:#061a43f2;border-bottom:1px solid #d5a92866;padding:14px 4%;display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap}header b,h1,h2{color:${G}}nav{display:flex;gap:10px;flex-wrap:wrap}a{color:white}main{width:min(1000px,92%);margin:28px auto}.summary{background:#08265dcc;border:1px solid #d5a92866;padding:14px 16px;border-radius:16px;margin-bottom:14px;color:#ffe08a}.form{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;background:#08265dcc;border:1px solid #d5a92866;padding:18px;border-radius:20px}.form label{display:flex;flex-direction:column;gap:7px;color:#f8dfa0;font-weight:800}.form input{padding:12px;border-radius:12px;border:1px solid #d5a92888;background:#fff;color:#111}.form button,.printbar button{grid-column:1/-1;padding:13px;border:0;border-radius:12px;background:${G};color:${D};font-weight:900}.list{display:grid;gap:12px;margin-top:18px}.list article{background:#0b3478;border:1px solid #d5a92866;border-radius:16px;padding:15px;display:grid;gap:6px}.list b{color:#ffd65b}.list small{opacity:.82}.report h2{margin-top:26px}.printbar{margin:24px 0}footer{text-align:center;padding:28px;color:#e8d49b}@media(max-width:700px){.form{grid-template-columns:1fr}}@media print{header,footer,.printbar{display:none}body{background:white;color:#111}.list article{background:white;color:#111;border-color:#aaa}.list b,h1,h2{color:#111}}`}
+function money(n){return new Intl.NumberFormat('ar-SD',{maximumFractionDigits:2}).format(Number(n||0))}
+function v(f,k){return String(f.get(k)||'').trim()}function e(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}function H(x){return new Response(x,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff','x-frame-options':'DENY'}})}function red(x){return new Response(null,{status:303,headers:{Location:x}})}
