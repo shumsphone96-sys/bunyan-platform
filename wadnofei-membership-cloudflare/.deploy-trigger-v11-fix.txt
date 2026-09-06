@@ -1,0 +1,2 @@
+Force Cloudflare build for Wad Nofei v11 logo-route fix.
+Commit target: f2d6bc7bfb3f74f3c4554f49d58eb8c5b517f96f
