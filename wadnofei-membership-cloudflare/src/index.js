@@ -1,1 +1,1 @@
-export { default } from '../worker-quickedit.js';
+export { default } from '../worker-global-v2.js';
