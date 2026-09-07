@@ -4,12 +4,6 @@
   "main": "src/index.js",
   "compatibility_date": "2026-09-01",
   "compatibility_flags": ["nodejs_compat"],
-  "routes": [
-    {
-      "pattern": "members.shamsphone.net",
-      "custom_domain": true
-    }
-  ],
   "vars": {
     "APP_NAME": "نادي ود نفيع الرياضي الثقافي الاجتماعي",
     "APP_ORIGIN": "https://members.shamsphone.net",
