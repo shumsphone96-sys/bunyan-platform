@@ -13,10 +13,10 @@
   "vars": {
     "APP_NAME": "نادي ود نفيع الرياضي الثقافي الاجتماعي",
     "APP_ORIGIN": "https://members.shamsphone.net",
-    "WHATSAPP_PHONE_NUMBER_ID": "1281531978380444",
-    "WHATSAPP_BUSINESS_ACCOUNT_ID": "1880425336271578",
+    "WHATSAPP_PHONE_NUMBER_ID": "1320804307779976",
+    "WHATSAPP_BUSINESS_ACCOUNT_ID": "488322071036886",
     "WHATSAPP_TEST_RECIPIENT": "249912930540",
-    "WHATSAPP_MODE": "meta_test"
+    "WHATSAPP_MODE": "production"
   },
   "d1_databases": [
     {
