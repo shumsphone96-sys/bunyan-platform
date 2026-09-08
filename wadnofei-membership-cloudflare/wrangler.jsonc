@@ -12,6 +12,9 @@
     "WHATSAPP_TEST_RECIPIENT": "249912930540",
     "WHATSAPP_MODE": "production"
   },
+  "triggers": {
+    "crons": ["*/15 * * * *"]
+  },
   "d1_databases": [
     {
       "binding": "DB",
