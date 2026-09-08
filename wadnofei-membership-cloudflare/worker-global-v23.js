@@ -11,6 +11,14 @@ const TEMPLATES={
   membership_approved:{name:'wdn_membership_approved',params:r=>[r.full_name||'عضو النادي',r.member_no||'تم الإصدار']},
   application_rejected:{name:'wdn_application_rejected',params:r=>[r.full_name||'عضو النادي',r.application_no||'—',r.admin_note||'يرجى التواصل مع إدارة النادي']}
 };
+const EVENT_LABELS={
+  application_received:'تم استلام الطلب بنجاح',
+  review:'بدأت مراجعة الطلب',
+  'needs-info':'يحتاج الطلب إلى استكمال بيانات',
+  ready:'أصبح الطلب جاهزاً للاعتماد',
+  membership_approved:'تم اعتماد العضوية',
+  application_rejected:'تم تحديث الطلب إلى غير معتمد'
+};
 
 export default {
   async fetch(req, env, ctx) {
@@ -131,11 +139,16 @@ async function queueAndSend(env, row, eventType, message){
 
   let sent = await sendWhatsAppTemplate(env, actualRecipient, eventType, row);
   if (!sent.ok && sent.code === 132001) {
-    const fallback = await sendWhatsAppText(env, actualRecipient, message);
-    if (fallback.ok) {
-      sent = {...fallback, error:'تم الإرسال كنص داخل نافذة محادثة 24 ساعة لأن القالب ما زال قيد الاعتماد.'};
+    const universal = await sendUniversalTemplate(env, actualRecipient, eventType, row);
+    if (universal.ok) {
+      sent = {...universal,error:'تم الإرسال بالقالب العام الاحتياطي لأن قالب الحالة التفصيلي لم يُعتمد بعد.'};
     } else {
-      sent = {ok:false,error:`القالب غير معتمد بعد لدى Meta. ${fallback.error||''}`.trim(),code:132001};
+      const fallback = await sendWhatsAppText(env, actualRecipient, message);
+      if (fallback.ok) {
+        sent = {...fallback, error:'تم الإرسال كنص داخل نافذة محادثة 24 ساعة لأن القوالب ما زالت قيد الاعتماد.'};
+      } else {
+        sent = {ok:false,error:`قوالب Meta غير معتمدة بعد. ${universal.error||''} ${fallback.error||''}`.trim(),code:132001};
+      }
     }
   }
 
@@ -177,6 +190,21 @@ async function sendWhatsAppTemplate(env,to,eventType,row){
   } catch (e) {
     return {ok:false,error:String(e?.message || e)};
   }
+}
+
+async function sendUniversalTemplate(env,to,eventType,row){
+  if (!env.WHATSAPP_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) return {ok:false,error:'WhatsApp credentials incomplete'};
+  const params=[row.application_no||'—',EVENT_LABELS[eventType]||'يوجد تحديث جديد على الطلب'].map(v=>({type:'text',text:String(v)}));
+  try{
+    const r=await fetch(`https://graph.facebook.com/${META_VERSION}/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`,{
+      method:'POST',
+      headers:{authorization:`Bearer ${env.WHATSAPP_TOKEN}`,'content-type':'application/json'},
+      body:JSON.stringify({messaging_product:'whatsapp',to,type:'template',template:{name:'wdn_membership_update',language:{code:String(env.WHATSAPP_TEMPLATE_LANGUAGE||'ar')},components:[{type:'body',parameters:params}]}})
+    });
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok){const e=data?.error||{};return {ok:false,code:Number(e.code||0),error:[e.message,e.error_user_title,e.error_user_msg,e.code?`code ${e.code}`:''].filter(Boolean).join(' — ')||`HTTP ${r.status}`}}
+    return {ok:true,id:data?.messages?.[0]?.id||null};
+  }catch(e){return {ok:false,error:String(e?.message||e)}}
 }
 
 async function sendWhatsAppText(env,to,message){
