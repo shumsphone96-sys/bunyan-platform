@@ -1,6 +1,16 @@
 import app from './worker-global-v21.js';
 
 const CLUB='نادي ود نفيع الرياضي الثقافي الاجتماعي';
+const META_VERSION='v22.0';
+
+const TEMPLATES={
+  application_received:{name:'wdn_application_received',params:r=>[r.full_name||'عضو النادي',r.application_no||'—']},
+  review:{name:'wdn_review_started',params:r=>[r.full_name||'عضو النادي',r.application_no||'—']},
+  'needs-info':{name:'wdn_needs_info',params:r=>[r.full_name||'عضو النادي',r.application_no||'—',r.admin_note||'يرجى التواصل مع إدارة النادي']},
+  ready:{name:'wdn_ready_for_approval',params:r=>[r.full_name||'عضو النادي',r.application_no||'—']},
+  membership_approved:{name:'wdn_membership_approved',params:r=>[r.full_name||'عضو النادي',r.member_no||'تم الإصدار']},
+  application_rejected:{name:'wdn_application_rejected',params:r=>[r.full_name||'عضو النادي',r.application_no||'—',r.admin_note||'يرجى التواصل مع إدارة النادي']}
+};
 
 export default {
   async fetch(req, env, ctx) {
@@ -40,11 +50,11 @@ export default {
     if (path === '/club-admin/notifications' && method === 'GET' && response.headers.get('content-type')?.includes('text/html')) {
       let body = await response.text();
       body = body.replace('مركز الإشعارات · V21','مركز الإشعارات · V23');
-      body = body.replace('المرحلة الحالية تجريبية عبر Meta. بعد تثبيت الرقم الإنتاجي واعتماد قوالب الرسائل، سيتم تحويل التنبيهات إلى تشغيل تلقائي للعضوية والدفع.','الإشعارات الآلية موجهة الآن إلى رقم صاحب الطلب المسجل في نموذج العضوية.');
+      body = body.replace('المرحلة الحالية تجريبية عبر Meta. بعد تثبيت الرقم الإنتاجي واعتماد قوالب الرسائل، سيتم تحويل التنبيهات إلى تشغيل تلقائي للعضوية والدفع.','الإشعارات الآلية موجهة إلى رقم صاحب الطلب وتستخدم قوالب واتساب الرسمية المعتمدة.');
       body = body.replace('</main>', `<div style="width:min(820px,92%);margin:0 auto 34px"><a href="/club-admin/notifications/history" style="display:block;text-align:center;background:#d5a928;color:#061a43;text-decoration:none;padding:13px 16px;border-radius:14px;font-weight:900">سجل الإشعارات الآلية</a></div></main>`);
       const headers = new Headers(response.headers);
       headers.delete('content-length');
-      headers.set('x-wadnofei-ui','v23-direct-applicant-whatsapp');
+      headers.set('x-wadnofei-ui','v23-template-applicant-whatsapp');
       return new Response(body,{status:response.status,statusText:response.statusText,headers});
     }
 
@@ -76,7 +86,7 @@ async function afterNewApplication(env, submitted){
   try {
     const row = await env.DB.prepare(`SELECT id,application_no,full_name,phone FROM applications WHERE phone=? AND status='pending' ORDER BY id DESC LIMIT 1`).bind(submitted.phone).first();
     if (!row) return;
-    const msg = `مرحباً ${row.full_name || 'بك'}،\nتم استلام طلب عضويتك في ${CLUB} بنجاح.\nرقم الطلب: ${row.application_no}\nيمكنك متابعة حالة الطلب من: ${origin(env)}/membership/track`;
+    const msg = `مرحباً ${row.full_name || 'بك'}،\nتم استلام طلب عضويتك في ${CLUB} بنجاح.\nرقم الطلب: ${row.application_no}`;
     await queueAndSend(env, row, 'application_received', msg);
   } catch (_) {}
 }
@@ -89,14 +99,15 @@ async function afterStageChange(env, applicationId, action){
     let event = action;
     let msg = '';
     if (action === 'review') {
-      msg = `عزيزي ${row.full_name}،\nبدأت إدارة ${CLUB} مراجعة طلب العضوية رقم ${row.application_no}. سنخطرك بأي تحديث.`;
+      msg = `عزيزي ${row.full_name}،\nبدأت إدارة ${CLUB} مراجعة طلب العضوية رقم ${row.application_no}.`;
     } else if (action === 'needs-info') {
       msg = `عزيزي ${row.full_name}،\nطلب العضوية رقم ${row.application_no} يحتاج استكمال بيانات.${row.admin_note ? `\nالمطلوب: ${row.admin_note}` : ''}`;
     } else if (action === 'ready') {
       msg = `عزيزي ${row.full_name}،\nتمت مراجعة طلبك رقم ${row.application_no} وأصبح جاهزاً للاعتماد النهائي.`;
     } else if (action === 'approve') {
       const member = await env.DB.prepare(`SELECT member_no FROM members WHERE application_id=? ORDER BY id DESC LIMIT 1`).bind(applicationId).first();
-      msg = `مبروك ${row.full_name} 🎉\nتم اعتماد عضويتك في ${CLUB}.\nرقم العضوية: ${member?.member_no || 'تم الإصدار'}\nنرحب بك عضواً في النادي.`;
+      row.member_no = member?.member_no || 'تم الإصدار';
+      msg = `مبروك ${row.full_name}\nتم اعتماد عضويتك في ${CLUB}.\nرقم العضوية: ${row.member_no}\nنرحب بك عضواً في النادي.`;
       event = 'membership_approved';
     } else if (action === 'reject') {
       msg = `عزيزي ${row.full_name}،\nتم تحديث طلب العضوية رقم ${row.application_no} إلى: غير معتمد.${row.admin_note ? `\nملاحظة الإدارة: ${row.admin_note}` : ''}`;
@@ -111,15 +122,14 @@ async function afterStageChange(env, applicationId, action){
 async function queueAndSend(env, row, eventType, message){
   const targetPhone = normalizePhone(row.phone);
   const actualRecipient = targetPhone;
-  const finalMessage = message;
 
   let insertedId = null;
   try {
-    const result = await env.DB.prepare(`INSERT INTO club_notifications(application_id,application_no,member_name,target_phone,actual_recipient,event_type,message,status) VALUES(?,?,?,?,?,?,?,'queued')`).bind(row.id,row.application_no,row.full_name,targetPhone,actualRecipient,eventType,finalMessage).run();
+    const result = await env.DB.prepare(`INSERT INTO club_notifications(application_id,application_no,member_name,target_phone,actual_recipient,event_type,message,status) VALUES(?,?,?,?,?,?,?,'queued')`).bind(row.id,row.application_no,row.full_name,targetPhone,actualRecipient,eventType,message).run();
     insertedId = result?.meta?.last_row_id || null;
   } catch (_) {}
 
-  const sent = await sendWhatsApp(env, actualRecipient, finalMessage);
+  const sent = await sendWhatsAppTemplate(env, actualRecipient, eventType, row);
   if (insertedId) {
     try {
       await env.DB.prepare(`UPDATE club_notifications SET status=?,provider_message_id=?,error=?,sent_at=CASE WHEN ?='sent' THEN CURRENT_TIMESTAMP ELSE sent_at END WHERE id=?`)
@@ -128,16 +138,31 @@ async function queueAndSend(env, row, eventType, message){
   }
 }
 
-async function sendWhatsApp(env,to,message){
+async function sendWhatsAppTemplate(env,to,eventType,row){
   if (!env.WHATSAPP_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) return {ok:false,error:'WhatsApp credentials incomplete'};
+  const cfg=TEMPLATES[eventType];
+  if (!cfg) return {ok:false,error:`No WhatsApp template configured for ${eventType}`};
+  const params=cfg.params(row).map(v=>({type:'text',text:String(v??'—')}));
   try {
-    const r = await fetch(`https://graph.facebook.com/v22.0/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`,{
+    const r = await fetch(`https://graph.facebook.com/${META_VERSION}/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`,{
       method:'POST',
       headers:{authorization:`Bearer ${env.WHATSAPP_TOKEN}`,'content-type':'application/json'},
-      body:JSON.stringify({messaging_product:'whatsapp',to,type:'text',text:{body:message}})
+      body:JSON.stringify({
+        messaging_product:'whatsapp',
+        to,
+        type:'template',
+        template:{
+          name:cfg.name,
+          language:{code:String(env.WHATSAPP_TEMPLATE_LANGUAGE||'ar')},
+          components:[{type:'body',parameters:params}]
+        }
+      })
     });
     const data = await r.json().catch(()=>({}));
-    if (!r.ok) return {ok:false,error:data?.error?.message || `HTTP ${r.status}`};
+    if (!r.ok) {
+      const e=data?.error||{};
+      return {ok:false,error:[e.message,e.error_user_title,e.error_user_msg,e.code?`code ${e.code}`:'',e.error_subcode?`subcode ${e.error_subcode}`:''].filter(Boolean).join(' — ') || `HTTP ${r.status}`};
+    }
     return {ok:true,id:data?.messages?.[0]?.id || null};
   } catch (e) {
     return {ok:false,error:String(e?.message || e)};
@@ -160,6 +185,5 @@ function page(title,content){
 }
 
 function label(v){return ({application_received:'استلام طلب',review:'بدء المراجعة','needs-info':'طلب استكمال',ready:'جاهز للاعتماد',membership_approved:'اعتماد العضوية',application_rejected:'رفض الطلب'})[v]||v||'إشعار'}
-function origin(env){return String(env.APP_ORIGIN || 'https://members.shamsphone.net').replace(/\/$/,'')}
 function normalizePhone(v){let s=String(v||'').replace(/\D/g,'');if(s.startsWith('0'))s='249'+s.slice(1);if(!s.startsWith('249'))s='249'+s;return s}
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
