@@ -129,11 +129,21 @@ async function queueAndSend(env, row, eventType, message){
     insertedId = result?.meta?.last_row_id || null;
   } catch (_) {}
 
-  const sent = await sendWhatsAppTemplate(env, actualRecipient, eventType, row);
+  let sent = await sendWhatsAppTemplate(env, actualRecipient, eventType, row);
+  if (!sent.ok && sent.code === 132001) {
+    const fallback = await sendWhatsAppText(env, actualRecipient, message);
+    if (fallback.ok) {
+      sent = {...fallback, error:'تم الإرسال كنص داخل نافذة محادثة 24 ساعة لأن القالب ما زال قيد الاعتماد.'};
+    } else {
+      sent = {ok:false,error:`القالب غير معتمد بعد لدى Meta. ${fallback.error||''}`.trim(),code:132001};
+    }
+  }
+
   if (insertedId) {
     try {
+      const status = sent.ok ? 'sent' : (sent.code===132001 ? 'waiting_template' : 'failed');
       await env.DB.prepare(`UPDATE club_notifications SET status=?,provider_message_id=?,error=?,sent_at=CASE WHEN ?='sent' THEN CURRENT_TIMESTAMP ELSE sent_at END WHERE id=?`)
-        .bind(sent.ok?'sent':'failed',sent.id||null,sent.error||null,sent.ok?'sent':'failed',insertedId).run();
+        .bind(status,sent.id||null,sent.error||null,status,insertedId).run();
     } catch (_) {}
   }
 }
@@ -161,12 +171,29 @@ async function sendWhatsAppTemplate(env,to,eventType,row){
     const data = await r.json().catch(()=>({}));
     if (!r.ok) {
       const e=data?.error||{};
-      return {ok:false,error:[e.message,e.error_user_title,e.error_user_msg,e.code?`code ${e.code}`:'',e.error_subcode?`subcode ${e.error_subcode}`:''].filter(Boolean).join(' — ') || `HTTP ${r.status}`};
+      return {ok:false,code:Number(e.code||0),error:[e.message,e.error_user_title,e.error_user_msg,e.code?`code ${e.code}`:'',e.error_subcode?`subcode ${e.error_subcode}`:''].filter(Boolean).join(' — ') || `HTTP ${r.status}`};
     }
     return {ok:true,id:data?.messages?.[0]?.id || null};
   } catch (e) {
     return {ok:false,error:String(e?.message || e)};
   }
+}
+
+async function sendWhatsAppText(env,to,message){
+  if (!env.WHATSAPP_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) return {ok:false,error:'WhatsApp credentials incomplete'};
+  try{
+    const r=await fetch(`https://graph.facebook.com/${META_VERSION}/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`,{
+      method:'POST',
+      headers:{authorization:`Bearer ${env.WHATSAPP_TOKEN}`,'content-type':'application/json'},
+      body:JSON.stringify({messaging_product:'whatsapp',to,type:'text',text:{body:String(message||'')}})
+    });
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok){
+      const e=data?.error||{};
+      return {ok:false,code:Number(e.code||0),error:[e.message,e.error_user_title,e.error_user_msg,e.code?`code ${e.code}`:'',e.error_subcode?`subcode ${e.error_subcode}`:''].filter(Boolean).join(' — ')||`HTTP ${r.status}`};
+    }
+    return {ok:true,id:data?.messages?.[0]?.id||null};
+  }catch(e){return {ok:false,error:String(e?.message||e)}}
 }
 
 async function notificationHistory(env){
@@ -176,12 +203,12 @@ async function notificationHistory(env){
     const r=await env.DB.prepare(`SELECT * FROM club_notifications ORDER BY id DESC LIMIT 200`).all();
     rows=r.results||[];
   } catch (_) {}
-  const cards = rows.length ? rows.map(x=>`<article><div><b>${esc(label(x.event_type))}</b><span class="status ${x.status==='sent'?'sent':x.status==='failed'?'failed':''}">${esc(x.status)}</span></div><h3>${esc(x.member_name||'—')}</h3><p>${esc(x.application_no||'')}</p><small>الرقم: <span dir="ltr">+${esc(x.actual_recipient||'')}</span> · ${esc(x.created_at||'')}</small>${x.error?`<pre>${esc(x.error)}</pre>`:''}</article>`).join('') : '<article>لا توجد إشعارات مسجلة حتى الآن.</article>';
+  const cards = rows.length ? rows.map(x=>`<article><div><b>${esc(label(x.event_type))}</b><span class="status ${x.status==='sent'?'sent':x.status==='failed'?'failed':x.status==='waiting_template'?'waiting':''}">${esc(x.status==='waiting_template'?'بانتظار اعتماد Meta':x.status)}</span></div><h3>${esc(x.member_name||'—')}</h3><p>${esc(x.application_no||'')}</p><small>الرقم: <span dir="ltr">+${esc(x.actual_recipient||'')}</span> · ${esc(x.created_at||'')}</small>${x.error?`<pre>${esc(x.error)}</pre>`:''}</article>`).join('') : '<article>لا توجد إشعارات مسجلة حتى الآن.</article>';
   return page('سجل الإشعارات الآلية',cards);
 }
 
 function page(title,content){
-  return new Response(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#061a43"><title>${esc(title)}</title><style>*{box-sizing:border-box}body{margin:0;background:linear-gradient(160deg,#061a43,#0a347c);color:#fff;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,Arial;min-height:100vh}main{width:min(900px,92%);margin:32px auto}header{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:18px}h1{color:#d5a928}a{background:#d5a928;color:#061a43;text-decoration:none;padding:11px 14px;border-radius:12px;font-weight:900}.list{display:grid;gap:12px}article{background:#08265dcc;border:1px solid #d5a92866;border-radius:18px;padding:16px}article>div{display:flex;justify-content:space-between;gap:10px}article b{color:#ffd65b}.status{background:#ffffff18;padding:5px 9px;border-radius:999px}.sent{color:#7CFF9B}.failed{color:#ff9b9b}h3{margin:10px 0 4px}p,small{opacity:.9}pre{white-space:pre-wrap;background:#0003;padding:10px;border-radius:10px;color:#ffd0d0}</style></head><body><main><header><h1>${esc(title)}</h1><a href="/club-admin/notifications">العودة</a></header><div class="list">${content}</div></main></body></html>`,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store'}});
+  return new Response(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#061a43"><title>${esc(title)}</title><style>*{box-sizing:border-box}body{margin:0;background:linear-gradient(160deg,#061a43,#0a347c);color:#fff;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,Arial;min-height:100vh}main{width:min(900px,92%);margin:32px auto}header{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:18px}h1{color:#d5a928}a{background:#d5a928;color:#061a43;text-decoration:none;padding:11px 14px;border-radius:12px;font-weight:900}.list{display:grid;gap:12px}article{background:#08265dcc;border:1px solid #d5a92866;border-radius:18px;padding:16px}article>div{display:flex;justify-content:space-between;gap:10px}article b{color:#ffd65b}.status{background:#ffffff18;padding:5px 9px;border-radius:999px}.sent{color:#7CFF9B}.failed{color:#ff9b9b}.waiting{color:#ffd65b}h3{margin:10px 0 4px}p,small{opacity:.9}pre{white-space:pre-wrap;background:#0003;padding:10px;border-radius:10px;color:#ffd0d0}</style></head><body><main><header><h1>${esc(title)}</h1><a href="/club-admin/notifications">العودة</a></header><div class="list">${content}</div></main></body></html>`,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store'}});
 }
 
 function label(v){return ({application_received:'استلام طلب',review:'بدء المراجعة','needs-info':'طلب استكمال',ready:'جاهز للاعتماد',membership_approved:'اعتماد العضوية',application_rejected:'رفض الطلب'})[v]||v||'إشعار'}
