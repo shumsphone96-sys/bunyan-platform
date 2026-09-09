@@ -1,6 +1,7 @@
 import app from './worker-global-v9.js';
-import { LOGO_B64, LOGO_MIME } from './logo.js';
+import { LOGO_B64 } from './logo.js';
 
+const LOGO_MIME = 'image/jpeg';
 const CLUB = 'نادي ود نفيع الرياضي الثقافي الاجتماعي';
 const LOGO = `data:${LOGO_MIME};base64,${LOGO_B64}`;
 const GOLD = '#d5a928';
