@@ -1,6 +1,7 @@
 import app from './worker-global-v10.js';
-import { LOGO_B64, LOGO_MIME } from './logo.js';
+import { LOGO_B64 } from './logo.js';
 
+const LOGO_MIME = 'image/jpeg';
 const DATA_URI = `data:${LOGO_MIME};base64,${LOGO_B64}`;
 const LOGO_PATH = '/wdn-logo.jpg?v=11';
 
