@@ -1,1 +1,1 @@
-export { default } from '../worker-global-v57.js';
+export { default } from '../worker-global-v58.js';
