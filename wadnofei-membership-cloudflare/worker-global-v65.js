@@ -1,3 +1,4 @@
+import { pbkdf2 } from 'node:crypto';
 import app from './worker-global-v64.js';
 
 const CLUB='نادي ود نفيع الرياضي الثقافي الاجتماعي';
@@ -8,6 +9,11 @@ const GENERAL_ADMIN=new Set(['president','secretary']);
 export default {
   async fetch(req,env,ctx){
     const u=new URL(req.url), p=u.pathname.replace(/\/$/,'')||'/', m=req.method.toUpperCase();
+    // Public/member requests do not use this layer's staff tables or session.
+    // Keep the original Request/body and all downstream handlers unchanged.
+    if(!p.startsWith('/club-admin')&&p!=='/staff-login'&&p!=='/staff-logout'){
+      return app.fetch(req,env,ctx);
+    }
     if(env.DB) await ensure(env.DB);
 
     if(p==='/staff-login'){
@@ -70,12 +76,12 @@ async function ensure(db){
 
 async function staffSession(req,db){
   const token=cookie(req,'club_sid'); if(!token)return null;
-  try{return await db.prepare(`SELECT u.id,u.username,u.full_name,u.role FROM club_staff_sessions s JOIN club_staff_users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at>datetime('now') AND u.is_active=1`).bind(token).first()}catch(_){return null}
+  try{return await db.prepare(`SELECT u.id,u.username,u.full_name,u.role FROM club_staff_sessions s JOIN club_staff_users u ON u.id=s.user_id WHERE s.token=? AND julianday(s.expires_at)>julianday('now') AND u.is_active=1`).bind(token).first()}catch(_){return null}
 }
 async function legacyAdmin(req,db){
   const token=cookie(req,'sid'); if(!token)return null;
-  try{const a=await db.prepare(`SELECT a.id,a.username FROM sessions s JOIN admins a ON a.id=s.admin_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(token).first();if(a)return a}catch(_){}
-  try{return await db.prepare(`SELECT u.id,u.username FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(token).first()}catch(_){return null}
+  try{const a=await db.prepare(`SELECT a.id,a.username FROM sessions s JOIN admins a ON a.id=s.admin_id WHERE s.token=? AND julianday(s.expires_at)>julianday('now')`).bind(token).first();if(a)return a}catch(_){}
+  try{return await db.prepare(`SELECT u.id,u.username FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND julianday(s.expires_at)>julianday('now')`).bind(token).first()}catch(_){return null}
 }
 async function accessGate(req,db){
   const staff=await staffSession(req,db);
@@ -100,6 +106,7 @@ async function createUser(req,db,actor,bootstrap){
   if(!sameOrigin(req))return forbidden('طلب غير صالح.');
   const f=await req.formData(),username=String(f.get('username')||'').trim(),full=String(f.get('full_name')||'').trim(),role=String(f.get('role')||''),password=String(f.get('password')||'');
   if(!/^[A-Za-z0-9._-]{3,40}$/.test(username)||!ROLES[role]||password.length<8)return redirect('/club-admin/access?error=validation');
+  if(bootstrap&&!GENERAL_ADMIN.has(role))return forbidden('يجب أن يكون الحساب الأول للرئيس أو السكرتير.');
   const {salt,hash}=await hashPassword(password);
   try{const r=await db.prepare(`INSERT INTO club_staff_users(username,full_name,role,password_hash,password_salt) VALUES(?,?,?,?,?)`).bind(username,full,role,hash,salt).run();await audit(db,actor.username,'create','staff_user',r.meta?.last_row_id,`${username} | ${role}`)}catch(_){return redirect('/club-admin/access?error=duplicate')}
   return redirect('/club-admin/access?ok=1');
@@ -107,6 +114,7 @@ async function createUser(req,db,actor,bootstrap){
 async function setUserState(req,db,actor,id,enable){
   if(!sameOrigin(req))return forbidden('طلب غير صالح.');
   if(actor.id===id&&!enable)return forbidden('لا يمكنك تعطيل حسابك الحالي.');
+  if(!enable){const target=await db.prepare('SELECT role FROM club_staff_users WHERE id=?').bind(id).first();if(target&&GENERAL_ADMIN.has(target.role)){const remaining=await db.prepare("SELECT COUNT(*) c FROM club_staff_users WHERE is_active=1 AND role IN ('president','secretary') AND id<>?").bind(id).first();if(!Number(remaining?.c))return forbidden('لا يمكن إيقاف آخر حساب إداري عام.');}}
   await db.prepare(`UPDATE club_staff_users SET is_active=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(enable?1:0,id).run();
   if(!enable)try{await db.prepare(`DELETE FROM club_staff_sessions WHERE user_id=?`).bind(id).run()}catch(_){}
   await audit(db,actor.username,enable?'enable':'disable','staff_user',id,'');
@@ -121,15 +129,27 @@ async function accessPage(db,user,bootstrap){
 }
 function loginPage(next='/club-admin',error=''){return page('دخول الإدارة',`${error?`<div class="err">${esc(error)}</div>`:''}<section class="login"><h2>حساب الصلاحيات</h2><form method="post" action="/staff-login"><input type="hidden" name="next" value="${escAttr(safeNext(next))}"><input name="username" autocomplete="username" placeholder="اسم المستخدم" required><input type="password" name="password" autocomplete="current-password" placeholder="كلمة المرور" required><button>دخول</button></form><p>كل مسؤول يستخدم حسابه الشخصي. لا توجد كلمة مرور مشتركة.</p></section>`)}
 
-async function hashPassword(password){const saltBytes=crypto.getRandomValues(new Uint8Array(16));const salt=toHex(saltBytes);const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:saltBytes,iterations:150000,hash:'SHA-256'},key,256);return {salt,hash:toHex(new Uint8Array(bits))}}
-async function verifyPassword(password,salt,expected){try{const saltBytes=fromHex(salt);const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:saltBytes,iterations:150000,hash:'SHA-256'},key,256);return timingSafe(toHex(new Uint8Array(bits)),String(expected||''))}catch(_){return false}}
+async function hashPassword(password){const saltBytes=crypto.getRandomValues(new Uint8Array(16));const salt=toHex(saltBytes);const bits=await new Promise((resolve,reject)=>pbkdf2(password,saltBytes,150000,32,'sha256',(error,key)=>error?reject(error):resolve(key)));return {salt,hash:toHex(new Uint8Array(bits))}}
+async function verifyPassword(password,salt,expected){try{const saltBytes=fromHex(salt);const bits=await new Promise((resolve,reject)=>pbkdf2(password,saltBytes,150000,32,'sha256',(error,key)=>error?reject(error):resolve(key)));return timingSafe(toHex(new Uint8Array(bits)),String(expected||''))}catch(_){return false}}
 function timingSafe(a,b){if(a.length!==b.length)return false;let x=0;for(let i=0;i<a.length;i++)x|=a.charCodeAt(i)^b.charCodeAt(i);return x===0}
 function toHex(a){return [...a].map(b=>b.toString(16).padStart(2,'0')).join('')}
 function fromHex(s){if(!/^[0-9a-f]+$/i.test(s)||s.length%2)throw 0;const a=new Uint8Array(s.length/2);for(let i=0;i<a.length;i++)a[i]=parseInt(s.slice(i*2,i*2+2),16);return a}
 function randomHex(n){return toHex(crypto.getRandomValues(new Uint8Array(n)))}
-function cookie(req,name){const c=req.headers.get('cookie')||'',m=c.match(new RegExp('(?:^|;\\s*)'+name+'=([^;]+)'));return m?decodeURIComponent(m[1]):''}
+function cookie(req,name){
+  const c=req.headers.get('cookie')||'',m=c.match(new RegExp('(?:^|;\\s*)'+name+'=([^;]+)'));
+  if(!m)return '';
+  // Treat malformed percent-encoding as an absent credential, never a 500.
+  try{return decodeURIComponent(m[1])}catch(_){return ''}
+}
 function sameOrigin(req){const o=req.headers.get('origin');return !o||o===new URL(req.url).origin}
-function safeNext(x){return x.startsWith('/')&&!x.startsWith('//')?x:'/club-admin'}
+function safeNext(x){
+  const fallback='/club-admin',base='https://members.shamsphone.net';
+  if(typeof x!=='string'||!x.startsWith('/')||x.startsWith('//')||/[\\\u0000-\u001f\u007f]/.test(x))return fallback;
+  try{
+    const target=new URL(x,base);
+    return target.origin===base?target.pathname+target.search+target.hash:fallback;
+  }catch(_){return fallback}
+}
 async function audit(db,actor,action,type,id,details=''){try{await db.prepare(`INSERT INTO club_audit_log(actor,action,entity_type,entity_id,details) VALUES(?,?,?,?,?)`).bind(actor,action,type,String(id||''),details).run()}catch(_){}}
 function redirect(x){return new Response(null,{status:303,headers:{Location:x}})}
 function forbidden(msg){return page('غير مصرح',`<section class="login"><h2>غير مصرح</h2><p>${esc(msg)}</p><a class="btn" href="/club-admin">العودة للإدارة</a></section>`,403)}

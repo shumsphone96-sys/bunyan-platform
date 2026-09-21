@@ -1,0 +1,64 @@
+name: WadNofei Membership Quality
+
+on:
+  push:
+    branches: [wadnofei-cloudflare, fix/wadnofei-rbac-stability-20260921]
+    paths:
+      - 'wadnofei-membership-cloudflare/**'
+      - '.github/workflows/wadnofei-membership-quality.yml'
+  pull_request:
+    branches: [wadnofei-cloudflare]
+    paths:
+      - 'wadnofei-membership-cloudflare/**'
+      - '.github/workflows/wadnofei-membership-quality.yml'
+
+permissions:
+  contents: read
+concurrency:
+  group: wadnofei-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Regression and isolated runtime (not production release)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CI: 'true'
+      WRANGLER_SEND_METRICS: 'false'
+      WDN_TEST_COMPATIBILITY_DATE: '2026-08-06'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - name: Preserve source reference (not a database backup)
+        run: |
+          mkdir -p /tmp/wdn-evidence
+          git rev-parse HEAD > /tmp/wdn-evidence/source-commit.txt
+          git archive --format=tar HEAD wadnofei-membership-cloudflare > /tmp/wdn-evidence/reviewed-source.tar
+          echo 'Installed runtime tested at 2026-08-06. Production compatibility 2026-09-01 still requires verification on a matching engine.' | tee /tmp/wdn-evidence/runtime-limit.txt
+      - name: Run isolated and full-handler regression tests
+        run: |
+          set -o pipefail
+          node --experimental-vm-modules --test --test-concurrency=1 wadnofei-membership-cloudflare/tests/*.test.mjs | tee /tmp/wdn-evidence/regression.txt
+      - name: Install locked dependencies
+        working-directory: wadnofei-membership-cloudflare
+        run: npm ci --no-audit --no-fund
+      - name: Compile only - never upload or deploy
+        working-directory: wadnofei-membership-cloudflare
+        run: |
+          set -o pipefail
+          npx wrangler deploy --dry-run --outdir /tmp/wdn-compiled | tee /tmp/wdn-evidence/compile.txt
+      - name: Test installed workerd, local D1, real QR, and signed synthetic receipts
+        working-directory: wadnofei-membership-cloudflare
+        run: |
+          set -o pipefail
+          node tests/runtime.e2e.mjs 2>&1 | tee /tmp/wdn-evidence/runtime.txt
+      - name: Store test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wadnofei-review-${{ github.sha }}
+          path: /tmp/wdn-evidence/
+          retention-days: 7
