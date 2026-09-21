@@ -48,6 +48,10 @@ jobs:
           assert s.count(old)==1
           s=s.replace(old,"compatibilityDate:process.env.WDN_TEST_COMPATIBILITY_DATE||'2026-09-01'")
           s=s.replace("runtime:'workerd + local D1',checks", "runtime:'workerd + local D1',compatibilityDate:process.env.WDN_TEST_COMPATIBILITY_DATE||'2026-09-01',checks")
+          s="import {dirname,resolve} from 'node:path';\n"+s
+          old="const mf=new Miniflare({modules:true,scriptPath:process.env.WDN_BUNDLE||'/tmp/wdn-compiled/index.js',"
+          assert s.count(old)==1
+          s=s.replace(old,"const bundlePath=resolve(process.env.WDN_BUNDLE||'/tmp/wdn-compiled/index.js');\nconst mf=new Miniflare({modules:true,modulesRoot:dirname(bundlePath),scriptPath:bundlePath,")
           runtime.write_text(s)
           ignore=pathlib.Path('wadnofei-membership-cloudflare/.gitignore')
           assert not ignore.exists()
