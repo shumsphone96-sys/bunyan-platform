@@ -1,0 +1,62 @@
+name: Wad Nofei Stability Gate
+
+on:
+  push:
+    branches:
+      - wadnofei-stability-v1
+    paths:
+      - 'wadnofei-membership-cloudflare/**'
+      - '.github/workflows/wadnofei-stability.yml'
+  pull_request:
+    branches:
+      - wadnofei-cloudflare
+    paths:
+      - 'wadnofei-membership-cloudflare/**'
+      - '.github/workflows/wadnofei-stability.yml'
+
+jobs:
+  stability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check JavaScript syntax
+        run: |
+          set -e
+          node --check wadnofei-membership-cloudflare/worker-global-v66.js
+          node --check wadnofei-membership-cloudflare/worker-global-v67.js
+          node --check wadnofei-membership-cloudflare/worker-global-v68.js
+          node --check wadnofei-membership-cloudflare/worker-global-v69.js
+          node --check wadnofei-membership-cloudflare/worker-global-v70.js
+          node --check wadnofei-membership-cloudflare/worker-global-v71.js
+          node --check wadnofei-membership-cloudflare/worker-global-v72.js
+          node --check wadnofei-membership-cloudflare/worker-global-v73.js
+          node --check wadnofei-membership-cloudflare/src/index.js
+
+      - name: Verify active worker version
+        run: |
+          grep -F "worker-global-v73.js" wadnofei-membership-cloudflare/src/index.js
+
+      - name: Block destructive membership SQL in new layers
+        run: |
+          set -e
+          if grep -Eni "DROP[[:space:]]+TABLE|DELETE[[:space:]]+FROM[[:space:]]+(members|applications)|TRUNCATE"             wadnofei-membership-cloudflare/worker-global-v7{1,2,3}.js; then
+            echo "Destructive SQL detected in v71-v73"
+            exit 1
+          fi
+
+      - name: Check required routes
+        run: |
+          set -e
+          grep -F "/track-membership" wadnofei-membership-cloudflare/worker-global-v71.js
+          grep -F "/club-admin/membership-center" wadnofei-membership-cloudflare/worker-global-v71.js
+          grep -F "/staff-recover" wadnofei-membership-cloudflare/worker-global-v72.js
+          grep -F "/club-admin/security-center" wadnofei-membership-cloudflare/worker-global-v72.js
+          grep -F "/club-admin/command-center" wadnofei-membership-cloudflare/worker-global-v73.js
+          grep -F "/club-admin/release-readiness" wadnofei-membership-cloudflare/worker-global-v73.js
+
+      - name: Summary
+        run: |
+          echo "Wad Nofei stability gate passed: syntax, active entrypoint, non-destructive membership SQL, and required routes."
