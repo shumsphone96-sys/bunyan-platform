@@ -27,19 +27,34 @@ jobs:
         run: |
           mkdir -p /tmp/wdn-evidence
           python3 - <<'PY'
-          import base64,hashlib,lzma,pathlib,subprocess
+          import base64,hashlib,lzma,pathlib,subprocess,json
           encoded=''.join(pathlib.Path(f'.maintenance/wdn-20260921.part{i}').read_text().strip() for i in [1,2,3])
           patch=lzma.decompress(base64.b64decode(encoded,validate=True))
           expected='2da617feb364431d3fc1178a63af39e2196aa6c12bcf71f13d480977c14c6a6c'
           assert hashlib.sha256(patch).hexdigest()==expected,'Patch integrity mismatch'
           path=pathlib.Path('/tmp/wdn-reviewed.patch');path.write_bytes(patch)
           paths=subprocess.check_output(['git','apply','--numstat','--unidiff-zero',str(path)],text=True)
+          targets=[]
           for line in paths.splitlines():
               target=line.split('\t',2)[2]
               assert target.startswith('wadnofei-membership-cloudflare/') and '..' not in pathlib.PurePosixPath(target).parts,target
+              targets.append(target)
           pathlib.Path('/tmp/wdn-evidence/patch-integrity.txt').write_text(expected+'\n'+paths)
           subprocess.run(['git','apply','--check','--unidiff-zero',str(path)],check=True)
           subprocess.run(['git','apply','--unidiff-zero',str(path)],check=True)
+          # Installed workerd supports 2026-08-06; keep production configuration unchanged.
+          runtime=pathlib.Path('wadnofei-membership-cloudflare/tests/runtime.e2e.mjs')
+          s=runtime.read_text();old="compatibilityDate:'2026-09-01'"
+          assert s.count(old)==1
+          s=s.replace(old,"compatibilityDate:process.env.WDN_TEST_COMPATIBILITY_DATE||'2026-09-01'")
+          s=s.replace("runtime:'workerd + local D1',checks", "runtime:'workerd + local D1',compatibilityDate:process.env.WDN_TEST_COMPATIBILITY_DATE||'2026-09-01',checks")
+          runtime.write_text(s)
+          ignore=pathlib.Path('wadnofei-membership-cloudflare/.gitignore')
+          assert not ignore.exists()
+          ignore.write_text('node_modules/\n.wrangler/\n.dev.vars*\n.env*\n!.env.example\nmembership-backup*.sql\nbackups/\n')
+          targets += ['wadnofei-membership-cloudflare/.gitignore','wadnofei-membership-cloudflare/package-lock.json']
+          pathlib.Path('/tmp/wdn-targets.json').write_text(json.dumps(targets))
+          pathlib.Path('/tmp/wdn-evidence/runtime-limit.txt').write_text('Test compatibility date: 2026-08-06. Production remains 2026-09-01 and still needs validation on a matching engine.\n')
           PY
       - name: Run 77 local regression checks
         run: |
@@ -53,18 +68,27 @@ jobs:
         run: |
           set -o pipefail
           npx wrangler deploy --dry-run --outdir /tmp/wdn-compiled | tee /tmp/wdn-evidence/compile.txt
-      - name: Exercise real workerd with isolated local D1 and blocked outbound traffic
+      - name: Exercise installed workerd with isolated local D1 and blocked outbound traffic
         working-directory: wadnofei-membership-cloudflare
+        env:
+          WDN_TEST_COMPATIBILITY_DATE: '2026-08-06'
         run: |
           set -o pipefail
-          node tests/runtime.e2e.mjs | tee /tmp/wdn-evidence/runtime.txt
+          node tests/runtime.e2e.mjs 2>&1 | tee /tmp/wdn-evidence/runtime.txt
       - name: Commit tested changes to the review branch only
         run: |
           set -euo pipefail
           test "$GITHUB_REF" = "refs/heads/$REVIEW_BRANCH"
           git fetch origin "$REVIEW_BRANCH"
           test "$(git rev-parse FETCH_HEAD)" = "$GITHUB_SHA"
-          git add -- wadnofei-membership-cloudflare
+          python3 - <<'PY'
+          import json,pathlib,subprocess
+          targets=json.loads(pathlib.Path('/tmp/wdn-targets.json').read_text())
+          subprocess.run(['git','add','--',*targets],check=True)
+          staged=subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines()
+          assert staged and set(staged).issubset(set(targets))
+          assert all('/node_modules/' not in p and '/.wrangler/' not in p for p in staged)
+          PY
           git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix(wadnofei): unify admin access and atomic membership lifecycle with verified runtime tests'
           git push origin "HEAD:refs/heads/$REVIEW_BRANCH"
           git rev-parse HEAD > /tmp/wdn-evidence/tested-commit.txt
