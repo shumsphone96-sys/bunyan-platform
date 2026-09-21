@@ -1,3 +1,4 @@
+import { getActor } from './auth.js';
 import app from './worker-global-v29.js';
 
 export default {
@@ -54,6 +55,6 @@ function polishCenter(html){
 }
 function fallbackMessage(n){return `إشعار من نادي ود نفيع الرياضي الثقافي الاجتماعي\n${n.member_name||''}\nرقم الطلب: ${n.application_no||''}`}
 function label(v){return ({application_received:'استلام طلب',review:'بدء المراجعة','needs-info':'طلب استكمال',ready:'جاهز للاعتماد',membership_approved:'اعتماد العضوية',application_rejected:'رفض الطلب'})[v]||v||'إشعار'}
-async function adminSession(req,db){if(!db)return null;const c=req.headers.get('cookie')||'',x=c.match(/(?:^|;\s*)sid=([^;]+)/);if(!x)return null;const t=decodeURIComponent(x[1]);try{const a=await db.prepare(`SELECT a.id FROM sessions s JOIN admins a ON a.id=s.admin_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(t).first();if(a)return a}catch(_){}try{return await db.prepare(`SELECT u.id FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(t).first()}catch(_){return null}}
+async function adminSession(req,db){return getActor(req,db)}
 function red(x){return new Response(null,{status:303,headers:{Location:x}})}
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}

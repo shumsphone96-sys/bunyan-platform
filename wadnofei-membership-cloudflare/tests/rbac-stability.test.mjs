@@ -4,8 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { DatabaseSync } from 'node:sqlite';
-import { SourceTextModule, SyntheticModule } from 'node:vm';
-import { webcrypto, pbkdf2Sync } from 'node:crypto';
+import { webcrypto, pbkdf2Sync, pbkdf2 } from 'node:crypto';
 
 const ORIGIN = 'https://members.shamsphone.net';
 const NOW = '2026-09-21 12:00:00';
@@ -60,14 +59,17 @@ async function load(downstream = {}) {
     async scheduled(...args) { seen.push({ scheduled: args }); return 'scheduled'; },
     ...downstream,
   };
-  const dependency = new SyntheticModule(['default'], function () { this.setExport('default', app); });
-  const mod = new SourceTextModule(source, { identifier: 'v65-under-test' });
-  await mod.link(specifier => {
-    assert.equal(specifier, './worker-global-v64.js');
-    return dependency;
-  });
-  await mod.evaluate();
-  return { worker: mod.namespace.default, seen };
+  // Normal ESM avoids Node 22 vm/native-crypto teardown instability.
+  const token='__WDN_TEST_'+Math.random().toString(16).slice(2);
+  globalThis[token]=app;
+  const original="import app from './worker-global-v64.js';";
+  assert.ok(source.includes(original));
+  const transformed=source.replace(original,`const app=globalThis[${JSON.stringify(token)}];`);
+  try {
+    const mod=await import('data:text/javascript;base64,'+Buffer.from(transformed).toString('base64'));
+    return {worker:mod.default,seen};
+  } finally {delete globalThis[token]}
+
 }
 
 function request(path, { cookie = '', method = 'GET', body } = {}) {

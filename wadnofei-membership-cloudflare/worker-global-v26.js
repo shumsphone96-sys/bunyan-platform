@@ -1,3 +1,4 @@
+import { getActor } from './auth.js';
 import app from './worker-global-v25.js';
 
 const CLUB='نادي ود نفيع الرياضي الثقافي الاجتماعي';
@@ -54,7 +55,7 @@ export default {
 
     const response=await app.fetch(req,env,ctx);
 
-    if(joinPost&&response.status<400&&env.DB&&extra){
+    if(joinPost&&response.status===201&&env.DB&&extra){
       ctx.waitUntil(afterJoinExtra(env,extra));
     }
 
@@ -111,21 +112,7 @@ async function initPlus(db){
   for(const [t,c,typ] of adds){try{await db.prepare(`ALTER TABLE ${t} ADD COLUMN ${c} ${typ}`).run()}catch(_){}}
 }
 
-async function adminSession(req,db){
-  const c=req.headers.get('cookie')||'';
-  const x=c.match(/(?:^|;\s*)sid=([^;]+)/);
-  if(!x) return null;
-  const token=decodeURIComponent(x[1]);
-  try{
-    const a=await db.prepare(`SELECT a.id,a.username,COALESCE(a.role,'owner') role FROM sessions s JOIN admins a ON a.id=s.admin_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(token).first();
-    if(a) return a;
-  }catch(_){ }
-  try{
-    const a=await db.prepare(`SELECT u.id,u.username,COALESCE(u.role,'admin') role FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(token).first();
-    if(a) return a;
-  }catch(_){ }
-  return null;
-}
+async function adminSession(req,db){return getActor(req,db)}
 
 async function columns(db,table){
   try{const r=await db.prepare(`PRAGMA table_info(${table})`).all();return new Set((r.results||[]).map(x=>x.name));}catch(_){return new Set()}

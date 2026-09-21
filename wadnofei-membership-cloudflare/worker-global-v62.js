@@ -1,3 +1,4 @@
+import { getActor } from './auth.js';
 import app from './worker-global-v61.js';
 
 const CLUB='نادي ود نفيع الرياضي الثقافي الاجتماعي';
@@ -52,8 +53,17 @@ async function ensure(db){
     `CREATE TABLE IF NOT EXISTS club_audit_log(id INTEGER PRIMARY KEY AUTOINCREMENT,actor TEXT,action TEXT,entity_type TEXT,entity_id TEXT,details TEXT,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`
   ];
   for(const q of qs){try{await db.prepare(q).run()}catch(_){}}
+  const cols=new Set((await db.prepare('PRAGMA table_info(club_news)').all()).results.map(x=>x.name));
+  if(!cols.has('is_published')) {
+    await db.prepare('ALTER TABLE club_news ADD COLUMN is_published INTEGER NOT NULL DEFAULT 0').run();
+    if(cols.has('status')) await db.prepare("UPDATE club_news SET is_published=1 WHERE status IN ('published','منشور')").run();
+  }
+  for(const [col,kind] of [['category',"TEXT DEFAULT 'عام'"],['created_by','TEXT'],['status',"TEXT DEFAULT 'draft'"]]) {
+    if(!cols.has(col)) await db.prepare(`ALTER TABLE club_news ADD COLUMN ${col} ${kind}`).run();
+  }
+
 }
-async function adminSession(req,db){const c=req.headers.get('cookie')||'',x=c.match(/(?:^|;\s*)sid=([^;]+)/);if(!x)return null;const t=decodeURIComponent(x[1]);try{const a=await db.prepare(`SELECT a.id,a.username FROM sessions s JOIN admins a ON a.id=s.admin_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(t).first();if(a)return a}catch(_){}try{return await db.prepare(`SELECT u.id,u.username FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(t).first()}catch(_){return null}}
+async function adminSession(req,db){return getActor(req,db)}
 async function many(db,q,b=[]){try{return (await db.prepare(q).bind(...b).all()).results||[]}catch(_){return []}}
 async function audit(db,a,action,type,id,details=''){try{await db.prepare(`INSERT INTO club_audit_log(actor,action,entity_type,entity_id,details) VALUES(?,?,?,?,?)`).bind(a?.username||'admin',action,type,String(id||''),details).run()}catch(_){}}
 

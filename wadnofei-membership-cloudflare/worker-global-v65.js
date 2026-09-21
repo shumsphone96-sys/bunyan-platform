@@ -1,3 +1,4 @@
+import { pbkdf2 } from 'node:crypto';
 import app from './worker-global-v64.js';
 
 const CLUB='نادي ود نفيع الرياضي الثقافي الاجتماعي';
@@ -105,6 +106,7 @@ async function createUser(req,db,actor,bootstrap){
   if(!sameOrigin(req))return forbidden('طلب غير صالح.');
   const f=await req.formData(),username=String(f.get('username')||'').trim(),full=String(f.get('full_name')||'').trim(),role=String(f.get('role')||''),password=String(f.get('password')||'');
   if(!/^[A-Za-z0-9._-]{3,40}$/.test(username)||!ROLES[role]||password.length<8)return redirect('/club-admin/access?error=validation');
+  if(bootstrap&&!GENERAL_ADMIN.has(role))return forbidden('يجب أن يكون الحساب الأول للرئيس أو السكرتير.');
   const {salt,hash}=await hashPassword(password);
   try{const r=await db.prepare(`INSERT INTO club_staff_users(username,full_name,role,password_hash,password_salt) VALUES(?,?,?,?,?)`).bind(username,full,role,hash,salt).run();await audit(db,actor.username,'create','staff_user',r.meta?.last_row_id,`${username} | ${role}`)}catch(_){return redirect('/club-admin/access?error=duplicate')}
   return redirect('/club-admin/access?ok=1');
@@ -112,6 +114,7 @@ async function createUser(req,db,actor,bootstrap){
 async function setUserState(req,db,actor,id,enable){
   if(!sameOrigin(req))return forbidden('طلب غير صالح.');
   if(actor.id===id&&!enable)return forbidden('لا يمكنك تعطيل حسابك الحالي.');
+  if(!enable){const target=await db.prepare('SELECT role FROM club_staff_users WHERE id=?').bind(id).first();if(target&&GENERAL_ADMIN.has(target.role)){const remaining=await db.prepare("SELECT COUNT(*) c FROM club_staff_users WHERE is_active=1 AND role IN ('president','secretary') AND id<>?").bind(id).first();if(!Number(remaining?.c))return forbidden('لا يمكن إيقاف آخر حساب إداري عام.');}}
   await db.prepare(`UPDATE club_staff_users SET is_active=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(enable?1:0,id).run();
   if(!enable)try{await db.prepare(`DELETE FROM club_staff_sessions WHERE user_id=?`).bind(id).run()}catch(_){}
   await audit(db,actor.username,enable?'enable':'disable','staff_user',id,'');
@@ -126,8 +129,8 @@ async function accessPage(db,user,bootstrap){
 }
 function loginPage(next='/club-admin',error=''){return page('دخول الإدارة',`${error?`<div class="err">${esc(error)}</div>`:''}<section class="login"><h2>حساب الصلاحيات</h2><form method="post" action="/staff-login"><input type="hidden" name="next" value="${escAttr(safeNext(next))}"><input name="username" autocomplete="username" placeholder="اسم المستخدم" required><input type="password" name="password" autocomplete="current-password" placeholder="كلمة المرور" required><button>دخول</button></form><p>كل مسؤول يستخدم حسابه الشخصي. لا توجد كلمة مرور مشتركة.</p></section>`)}
 
-async function hashPassword(password){const saltBytes=crypto.getRandomValues(new Uint8Array(16));const salt=toHex(saltBytes);const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:saltBytes,iterations:150000,hash:'SHA-256'},key,256);return {salt,hash:toHex(new Uint8Array(bits))}}
-async function verifyPassword(password,salt,expected){try{const saltBytes=fromHex(salt);const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:saltBytes,iterations:150000,hash:'SHA-256'},key,256);return timingSafe(toHex(new Uint8Array(bits)),String(expected||''))}catch(_){return false}}
+async function hashPassword(password){const saltBytes=crypto.getRandomValues(new Uint8Array(16));const salt=toHex(saltBytes);const bits=await new Promise((resolve,reject)=>pbkdf2(password,saltBytes,150000,32,'sha256',(error,key)=>error?reject(error):resolve(key)));return {salt,hash:toHex(new Uint8Array(bits))}}
+async function verifyPassword(password,salt,expected){try{const saltBytes=fromHex(salt);const bits=await new Promise((resolve,reject)=>pbkdf2(password,saltBytes,150000,32,'sha256',(error,key)=>error?reject(error):resolve(key)));return timingSafe(toHex(new Uint8Array(bits)),String(expected||''))}catch(_){return false}}
 function timingSafe(a,b){if(a.length!==b.length)return false;let x=0;for(let i=0;i<a.length;i++)x|=a.charCodeAt(i)^b.charCodeAt(i);return x===0}
 function toHex(a){return [...a].map(b=>b.toString(16).padStart(2,'0')).join('')}
 function fromHex(s){if(!/^[0-9a-f]+$/i.test(s)||s.length%2)throw 0;const a=new Uint8Array(s.length/2);for(let i=0;i<a.length;i++)a[i]=parseInt(s.slice(i*2,i*2+2),16);return a}
