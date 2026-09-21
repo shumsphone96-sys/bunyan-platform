@@ -1,0 +1,78 @@
+name: Apply Reviewed WadNofei Stability Patch
+on:
+  push:
+    branches: [fix/wadnofei-rbac-stability-20260921]
+    paths:
+      - '.github/workflows/wdn-apply-reviewed-patch.yml'
+      - '.maintenance/wdn-20260921.part*'
+permissions:
+  contents: read
+jobs:
+  apply-tested-code:
+    if: github.repository == 'shumsphone96-sys/bunyan-platform' && github.ref == 'refs/heads/fix/wadnofei-rbac-stability-20260921'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: write
+    env:
+      CI: 'true'
+      WRANGLER_SEND_METRICS: 'false'
+      REVIEW_BRANCH: fix/wadnofei-rbac-stability-20260921
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - name: Validate exact reviewed patch and restrict changed paths
+        run: |
+          mkdir -p /tmp/wdn-evidence
+          python3 - <<'PY'
+          import base64,hashlib,lzma,pathlib,subprocess
+          encoded=''.join(pathlib.Path(f'.maintenance/wdn-20260921.part{i}').read_text().strip() for i in [1,2,3])
+          patch=lzma.decompress(base64.b64decode(encoded,validate=True))
+          expected='2da617feb364431d3fc1178a63af39e2196aa6c12bcf71f13d480977c14c6a6c'
+          assert hashlib.sha256(patch).hexdigest()==expected,'Patch integrity mismatch'
+          path=pathlib.Path('/tmp/wdn-reviewed.patch');path.write_bytes(patch)
+          paths=subprocess.check_output(['git','apply','--numstat','--unidiff-zero',str(path)],text=True)
+          for line in paths.splitlines():
+              target=line.split('\t',2)[2]
+              assert target.startswith('wadnofei-membership-cloudflare/') and '..' not in pathlib.PurePosixPath(target).parts,target
+          pathlib.Path('/tmp/wdn-evidence/patch-integrity.txt').write_text(expected+'\n'+paths)
+          subprocess.run(['git','apply','--check','--unidiff-zero',str(path)],check=True)
+          subprocess.run(['git','apply','--unidiff-zero',str(path)],check=True)
+          PY
+      - name: Run 77 local regression checks
+        run: |
+          set -o pipefail
+          node --experimental-vm-modules --test --test-concurrency=1 wadnofei-membership-cloudflare/tests/*.test.mjs | tee /tmp/wdn-evidence/regression.txt
+      - name: Install test runtime and compiler without production credentials
+        working-directory: wadnofei-membership-cloudflare
+        run: npm install --no-audit --no-fund
+      - name: Build only - never deploy
+        working-directory: wadnofei-membership-cloudflare
+        run: |
+          set -o pipefail
+          npx wrangler deploy --dry-run --outdir /tmp/wdn-compiled | tee /tmp/wdn-evidence/compile.txt
+      - name: Exercise real workerd with isolated local D1 and blocked outbound traffic
+        working-directory: wadnofei-membership-cloudflare
+        run: |
+          set -o pipefail
+          node tests/runtime.e2e.mjs | tee /tmp/wdn-evidence/runtime.txt
+      - name: Commit tested changes to the review branch only
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/$REVIEW_BRANCH"
+          git fetch origin "$REVIEW_BRANCH"
+          test "$(git rev-parse FETCH_HEAD)" = "$GITHUB_SHA"
+          git add -- wadnofei-membership-cloudflare
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix(wadnofei): unify admin access and atomic membership lifecycle with verified runtime tests'
+          git push origin "HEAD:refs/heads/$REVIEW_BRANCH"
+          git rev-parse HEAD > /tmp/wdn-evidence/tested-commit.txt
+          git archive --format=tar HEAD wadnofei-membership-cloudflare > /tmp/wdn-evidence/reviewed-source.tar
+      - name: Retain actual test results even when a check fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wadnofei-full-runtime-${{ github.run_id }}
+          path: /tmp/wdn-evidence/
+          retention-days: 7
