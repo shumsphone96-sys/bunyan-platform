@@ -8,6 +8,11 @@ const GENERAL_ADMIN=new Set(['president','secretary']);
 export default {
   async fetch(req,env,ctx){
     const u=new URL(req.url), p=u.pathname.replace(/\/$/,'')||'/', m=req.method.toUpperCase();
+    // Public/member requests do not use this layer's staff tables or session.
+    // Keep the original Request/body and all downstream handlers unchanged.
+    if(!p.startsWith('/club-admin')&&p!=='/staff-login'&&p!=='/staff-logout'){
+      return app.fetch(req,env,ctx);
+    }
     if(env.DB) await ensure(env.DB);
 
     if(p==='/staff-login'){
@@ -60,7 +65,7 @@ export default {
 
 async function ensure(db){
   const qs=[
-    `CREATE TABLE IF NOT EXISTS club_staff_users(id INTEGER PRIMARY KEY AUTOINCREMENT,username TEXT NOT NULL UNIQUE,full_name TEXT,role TEXT NOT NULL,password_hash TEXT NOT NULL,password_salt TEXT NOT NULL,is_active INTEGER NOT NULL DEFAULT 1,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+    `CREATE TABLE IF NOT EXISTS club_staff_users(id INTEGER PRIMARY KEY AUTOINCREMENT,username TEXT NOT NULL UNIQUE,full_name TEXT,role TEXT NOT NULL,password_hash TEXT NOT NULL,password_salt TEXT NOT NULL,is_active INTEGER NOT NULL DEFAULT 1,created_at TEXT TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
     `CREATE TABLE IF NOT EXISTS club_staff_sessions(token TEXT PRIMARY KEY,user_id INTEGER NOT NULL,expires_at TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
     `CREATE INDEX IF NOT EXISTS idx_staff_sessions_user ON club_staff_sessions(user_id)`,
     `CREATE TABLE IF NOT EXISTS club_audit_log(id INTEGER PRIMARY KEY AUTOINCREMENT,actor TEXT,action TEXT,entity_type TEXT,entity_id TEXT,details TEXT,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`
@@ -70,12 +75,12 @@ async function ensure(db){
 
 async function staffSession(req,db){
   const token=cookie(req,'club_sid'); if(!token)return null;
-  try{return await db.prepare(`SELECT u.id,u.username,u.full_name,u.role FROM club_staff_sessions s JOIN club_staff_users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at>datetime('now') AND u.is_active=1`).bind(token).first()}catch(_){return null}
+  try{return await db.prepare(`SELECT u.id,u.username,u.full_name,u.role FROM club_staff_sessions s JOIN club_staff_users u ON u.id=s.user_id WHERE s.token=? AND julianday(s.expires_at)>julianday('now') AND u.is_active=1`).bind(token).first()}catch(_){return null}
 }
 async function legacyAdmin(req,db){
   const token=cookie(req,'sid'); if(!token)return null;
-  try{const a=await db.prepare(`SELECT a.id,a.username FROM sessions s JOIN admins a ON a.id=s.admin_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(token).first();if(a)return a}catch(_){}
-  try{return await db.prepare(`SELECT u.id,u.username FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(token).first()}catch(_){return null}
+  try{const a=await db.prepare(`SELECT a.id,a.username FROM sessions s JOIN admins a ON a.id=s.admin_id WHERE s.token=? AND julianday(s.expires_at)>julianday('now')`).bind(token).first();if(a)return a}catch(_){}
+  try{return await db.prepare(`SELECT u.id,u.username FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND julianday(s.expires_at)>julianday('now')`).bind(token).first()}catch(_){return null}
 }
 async function accessGate(req,db){
   const staff=await staffSession(req,db);
@@ -127,9 +132,21 @@ function timingSafe(a,b){if(a.length!==b.length)return false;let x=0;for(let i=0
 function toHex(a){return [...a].map(b=>b.toString(16).padStart(2,'0')).join('')}
 function fromHex(s){if(!/^[0-9a-f]+$/i.test(s)||s.length%2)throw 0;const a=new Uint8Array(s.length/2);for(let i=0;i<a.length;i++)a[i]=parseInt(s.slice(i*2,i*2+2),16);return a}
 function randomHex(n){return toHex(crypto.getRandomValues(new Uint8Array(n)))}
-function cookie(req,name){const c=req.headers.get('cookie')||'',m=c.match(new RegExp('(?:^|;\\s*)'+name+'=([^;]+)'));return m?decodeURIComponent(m[1]):''}
+function cookie(req,name){
+  const c=req.headers.get('cookie')||'',m=c.match(new RegExp('(?:^|;\\s*)'+name+'=([^;]+)'));
+  if(!m)return '';
+  // Treat malformed percent-encoding as an absent credential, never a 500.
+  try{return decodeURIComponent(m[1])}catch(_){return ''}
+}
 function sameOrigin(req){const o=req.headers.get('origin');return !o||o===new URL(req.url).origin}
-function safeNext(x){return x.startsWith('/')&&!x.startsWith('//')?x:'/club-admin'}
+function safeNext(x){
+  const fallback='/club-admin',base='https://members.shamsphone.net';
+  if(typeof x!=='string'||!x.startsWith('/')||x.startsWith('//')||/[\\\u0000-\u001f\u007f]/.test(x))return fallback;
+  try{
+    const target=new URL(x,base);
+    return target.origin===base?target.pathname+target.search+target.hash:fallback;
+  }catch(_){return fallback}
+}
 async function audit(db,actor,action,type,id,details=''){try{await db.prepare(`INSERT INTO club_audit_log(actor,action,entity_type,entity_id,details) VALUES(?,?,?,?,?)`).bind(actor,action,type,String(id||''),details).run()}catch(_){}}
 function redirect(x){return new Response(null,{status:303,headers:{Location:x}})}
 function forbidden(msg){return page('غير مصرح',`<section class="login"><h2>غير مصرح</h2><p>${esc(msg)}</p><a class="btn" href="/club-admin">العودة للإدارة</a></section>`,403)}
