@@ -41,8 +41,20 @@ async function ensure(db){const qs=[
  `CREATE TABLE IF NOT EXISTS club_security_audit(id INTEGER PRIMARY KEY AUTOINCREMENT,actor TEXT,action TEXT,target TEXT,details TEXT,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`
 ];for(const q of qs){try{await db.prepare(q).run()}catch(_){}}
 }
-async function sessionUser(req,db){const c=req.headers.get('cookie')||'',x=c.match(/(?:^|;\s*)sid=([^;]+)/);if(!x)return null;const t=decodeURIComponent(x[1]);try{const u=await db.prepare(`SELECT u.id,u.username,u.role FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(t).first();if(u)return u}catch(_){}try{const a=await db.prepare(`SELECT a.id,a.username,'owner' role FROM sessions s JOIN admins a ON a.id=s.admin_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(t).first();if(a)return a}catch(_){}return null}
-function roleKey(r){r=String(r||'').toLowerCase();if(['treasurer','finance','amin_mal'].includes(r))return'finance';if(['secretary','secretariat','scretary'].includes(r))return'secretary';if(['owner','superadmin','admin'].includes(r))return'owner';return'limited'}
+async function sessionUser(req,db){
+  const c=req.headers.get('cookie')||'';
+  const cs=c.match(/(?:^|;\s*)club_sid=([^;]+)/);
+  if(cs){
+    const t=decodeURIComponent(cs[1]);
+    try{const s=await db.prepare(`SELECT u.id,u.username,u.role FROM club_staff_sessions x JOIN club_staff_users u ON u.id=x.user_id WHERE x.token=? AND x.expires_at>datetime('now') AND u.is_active=1`).bind(t).first();if(s)return s}catch(_){}
+  }
+  const x=c.match(/(?:^|;\s*)sid=([^;]+)/);if(!x)return null;
+  const t=decodeURIComponent(x[1]);
+  try{const u=await db.prepare(`SELECT u.id,u.username,u.role FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(t).first();if(u)return u}catch(_){}
+  try{const a=await db.prepare(`SELECT a.id,a.username,'owner' role FROM sessions s JOIN admins a ON a.id=s.admin_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(t).first();if(a)return a}catch(_){}
+  return null
+}
+function roleKey(r){return normalizeRole(r)}
 function roleLabel(r){const k=roleKey(r);return k==='finance'?'أمين المال':k==='secretary'?'السكرتير':k==='owner'?'الرئيس/مدير النظام':k==='vice_president'?'نائب الرئيس':'مستخدم بصلاحيات محددة'}
 async function workspace(db,u){const k=roleKey(u.role);let cards='';if(k==='finance'||k==='owner'||k==='vice_president')cards+=card('المالية','مراجعة المدفوعات والإيصالات والموقف المالي.','/club-admin/finance')+card('العضويات والتجديد','متابعة الاشتراكات والحالة المالية للأعضاء.','/club-admin/memberships');if(k==='secretary'||k==='owner')cards+=card('طلبات العضوية','مراجعة الطلبات والإجراءات والسجل.','/applications')+card('قائمة العمل','المعاملات التي تحتاج إجراء ومتابعة.','/club-admin/workqueue')+card('النظام الأساسي','إدارة مشروع النظام الأساسي ووثيقته.','/club-admin/constitution');if(k==='owner')cards+=card('فحص النظام','الصحة وجودة البيانات والرقابة.','/club-admin/system-check');if(!cards)cards=card('حسابك','الحساب فعال، ولا توجد وحدات إضافية ممنوحة لهذه الصلاحية.','/club-admin/security');return adminPage('مساحة عملي',`<section class="who"><b>${esc(u.username)}</b><span>${esc(roleLabel(u.role))}</span></section><div class="grid">${cards}</div><p class="hint">ظهور الرابط لا يمنح الصلاحية وحده؛ كل عملية حساسة يجب أن تتحقق من الدور في الخادم.</p>`)}
 function card(t,d,h){return `<a class="card" href="${h}"><h2>${t}</h2><p>${d}</p><b>فتح ←</b></a>`}
