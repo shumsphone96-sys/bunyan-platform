@@ -1,0 +1,119 @@
+name: Wad Nofei Cloudflare Candidate
+
+on:
+  push:
+    branches:
+      - wadnofei-v73-stable-20260922
+    paths:
+      - 'wadnofei-membership-cloudflare/**'
+      - '.github/workflows/wadnofei-cloudflare-candidate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wadnofei-cloudflare-candidate
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WRANGLER_OUTPUT_FILE_PATH: /tmp/wrangler-output.ndjson
+
+    steps:
+      - name: Checkout stable V73
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Worker dependencies
+        working-directory: wadnofei-membership-cloudflare
+        run: npm install --no-audit --no-fund
+
+      - name: Re-run local safety gate
+        run: |
+          set -e
+          node --check wadnofei-membership-cloudflare/worker-global-v73.js
+          node wadnofei-membership-cloudflare/tests/role-security-smoke.mjs
+          grep -F "worker-global-v73.js" wadnofei-membership-cloudflare/src/index.js
+          if grep -Eni "DROP[[:space:]]+TABLE|DELETE[[:space:]]+FROM[[:space:]]+(members|applications)|TRUNCATE"             wadnofei-membership-cloudflare/worker-global-v7{1,2,3}.js; then
+            echo "Destructive membership SQL detected"
+            exit 1
+          fi
+
+      - name: Require Cloudflare connection
+        run: |
+          set -e
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::Cloudflare connection is not configured. Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID as GitHub Actions repository secrets."
+            exit 2
+          fi
+
+      - name: Verify Cloudflare authentication
+        working-directory: wadnofei-membership-cloudflare
+        run: npx wrangler whoami
+
+      - name: Record current production deployment
+        working-directory: wadnofei-membership-cloudflare
+        run: |
+          set -e
+          npx wrangler deployments list --name wadnofei-membership --json > /tmp/deployments-before.json
+          cat /tmp/deployments-before.json
+
+      - name: Record D1 rollback bookmark
+        working-directory: wadnofei-membership-cloudflare
+        run: |
+          set -e
+          npx wrangler d1 info wadnofei-membership-db --json > /tmp/d1-info.json
+          npx wrangler d1 time-travel info wadnofei-membership-db --json > /tmp/d1-bookmark.json
+          cat /tmp/d1-bookmark.json
+
+      - name: Upload V73 as non-live Worker version
+        working-directory: wadnofei-membership-cloudflare
+        run: |
+          set -e
+          npx wrangler versions upload             --tag wadnofei-v73-stable-20260922             --message "Wad Nofei V73 stable candidate 2026-09-22"             2>&1 | tee /tmp/version-upload.log
+
+      - name: Verify uploaded candidate
+        working-directory: wadnofei-membership-cloudflare
+        run: |
+          set -e
+          npx wrangler versions list --name wadnofei-membership --json > /tmp/versions-after.json
+          grep -F "wadnofei-v73-stable-20260922" /tmp/versions-after.json
+          cat /tmp/versions-after.json
+
+      - name: Preview smoke test when URL is available
+        run: |
+          set -e
+          PREVIEW_URL="$(grep -Eo 'https://[^[:space:]]+workers\.dev[^[:space:]]*' /tmp/version-upload.log | tail -1 | tr -d '),]"' || true)"
+          if [ -z "$PREVIEW_URL" ]; then
+            echo "No preview URL exposed by Wrangler; candidate upload itself was verified."
+            exit 0
+          fi
+          echo "Preview: $PREVIEW_URL"
+          code="$(curl -L --silent --show-error --max-time 20 --output /tmp/preview.html --write-out '%{http_code}' "$PREVIEW_URL")"
+          echo "HTTP $code"
+          test "$code" -ge 200
+          test "$code" -lt 500
+
+      - name: Save non-sensitive recovery metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: wadnofei-v73-candidate-metadata
+          path: |
+            /tmp/deployments-before.json
+            /tmp/d1-info.json
+            /tmp/d1-bookmark.json
+            /tmp/wrangler-output.ndjson
+            /tmp/versions-after.json
+            /tmp/version-upload.log
+          if-no-files-found: warn
+          retention-days: 7
