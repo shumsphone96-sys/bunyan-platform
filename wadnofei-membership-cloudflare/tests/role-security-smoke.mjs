@@ -30,7 +30,8 @@ const index=fs.readFileSync(new URL('../src/index.js',import.meta.url),'utf8');
 
 assert.match(v68,/club_sid/);
 assert.match(v69,/club_sid/);
-assert.match(v69,/isAllowed\(user\.role,area,m\)/);
+assert.match(v69,/allowed\(user\.role,area,m\)/);
+assert.match(v69,/function allowed\(role,area,method\)\{return isAllowed\(role,area,method\)\}/);
 assert.match(v71,/last4/);
 assert.match(v71,/maskName/);
 assert.doesNotMatch(v71,/DELETE\s+FROM\s+(members|applications)/i);
