@@ -1,4 +1,5 @@
 import app from './worker-global-v68.js';
+import {normalizeRole,classifyAdminPath,isAllowed} from './role-policy.js';
 
 export default {
   async fetch(req,env,ctx){
@@ -8,7 +9,7 @@ export default {
       if(user){
         const role=roleKey(user.role);
         const area=classify(p);
-        if(!allowed(role,area)){
+        if(!allowed(user.role,area,m)){
           await audit(env.DB,user,'access_denied',p,m);
           return denied();
         }
