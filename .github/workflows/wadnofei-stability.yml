@@ -35,6 +35,11 @@ jobs:
           node --check wadnofei-membership-cloudflare/worker-global-v73.js
           node --check wadnofei-membership-cloudflare/src/index.js
 
+      - name: Run role, security, and privacy smoke tests
+        run: |
+          set -e
+          node wadnofei-membership-cloudflare/tests/role-security-smoke.mjs
+
       - name: Verify active worker version
         run: |
           grep -F "worker-global-v73.js" wadnofei-membership-cloudflare/src/index.js
