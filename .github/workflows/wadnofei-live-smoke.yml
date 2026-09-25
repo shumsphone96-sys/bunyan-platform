@@ -1,4 +1,4 @@
-name: Wad Nofei V73 Preview Smoke
+name: Wad Nofei V74 Preview Smoke
 
 on:
   push:
@@ -6,6 +6,8 @@ on:
       - wadnofei-v73-cloudflare-preview
     paths:
       - '.github/workflows/wadnofei-live-smoke.yml'
+      - 'wadnofei-membership-cloudflare/src/index.js'
+      - 'wadnofei-membership-cloudflare/worker-global-v74.js'
   workflow_dispatch:
 
 permissions:
@@ -23,16 +25,17 @@ jobs:
         run: |
           set -euo pipefail
           for path in /membership /track-membership /club-admin /club-admin/command-center /club-admin/release-readiness; do
-            code=$(curl -L --max-redirs 5 --connect-timeout 10 --max-time 30               --silent --show-error --output /dev/null --write-out '%{http_code}' "$BASE_URL$path")
+            code=$(curl -L --max-redirs 5 --connect-timeout 10 --max-time 30 \
+              --silent --show-error --output /dev/null --write-out '%{http_code}' "$BASE_URL$path")
             echo "$path -> HTTP $code"
             test "$code" -ge 200
             test "$code" -lt 500
           done
 
-      - name: Verify V73 public content on preview
+      - name: Verify V74 public content on preview
         shell: bash
         run: |
           set -euo pipefail
           curl -fsSL --connect-timeout 10 --max-time 30 "$BASE_URL/membership" | grep -q "متابعة الطلب والعضوية"
           curl -fsSL --connect-timeout 10 --max-time 30 "$BASE_URL/track-membership" | grep -q "متابعة الطلب والعضوية"
-          echo "PREVIEW_SMOKE_OK"
+          echo "PREVIEW_V74_SMOKE_OK"
