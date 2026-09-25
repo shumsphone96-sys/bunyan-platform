@@ -1,4 +1,4 @@
-name: Wad Nofei Live Smoke
+name: Wad Nofei V73 Preview Smoke
 
 on:
   push:
@@ -6,6 +6,7 @@ on:
       - wadnofei-v73-cloudflare-preview
     paths:
       - '.github/workflows/wadnofei-live-smoke.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -14,23 +15,24 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      BASE_URL: https://wadnofei-v73-cloudflare-preview-wadnofei-membership.shumsphone96.workers.dev
     steps:
-      - name: Check live HTTP
+      - name: Check preview HTTP
         shell: bash
         run: |
           set -euo pipefail
-          base="https://members.shamsphone.net"
           for path in /membership /track-membership /club-admin /club-admin/command-center /club-admin/release-readiness; do
-            code=$(curl -L --max-redirs 5 --connect-timeout 10 --max-time 30               --silent --show-error --output /dev/null --write-out '%{http_code}' "$base$path")
+            code=$(curl -L --max-redirs 5 --connect-timeout 10 --max-time 30               --silent --show-error --output /dev/null --write-out '%{http_code}' "$BASE_URL$path")
             echo "$path -> HTTP $code"
             test "$code" -ge 200
             test "$code" -lt 500
           done
 
-      - name: Verify V73 public content
+      - name: Verify V73 public content on preview
         shell: bash
         run: |
           set -euo pipefail
-          curl -fsSL --connect-timeout 10 --max-time 30 "https://members.shamsphone.net/membership" | grep -q "متابعة الطلب والعضوية"
-          curl -fsSL --connect-timeout 10 --max-time 30 "https://members.shamsphone.net/track-membership" | grep -q "متابعة الطلب والعضوية"
-          echo "LIVE_SMOKE_OK"
+          curl -fsSL --connect-timeout 10 --max-time 30 "$BASE_URL/membership" | grep -q "متابعة الطلب والعضوية"
+          curl -fsSL --connect-timeout 10 --max-time 30 "$BASE_URL/track-membership" | grep -q "متابعة الطلب والعضوية"
+          echo "PREVIEW_SMOKE_OK"
