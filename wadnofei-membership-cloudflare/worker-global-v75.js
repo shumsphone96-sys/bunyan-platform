@@ -9,7 +9,7 @@ export default {
 
     if(p==='/club-admin/security-center/recovery-contacts'&&env.DB){
       const a=await actor(req,env.DB);
-      if(!a)return red('/staff-login?next=/club-admin/security-center/recovery-contacts');
+      if(!a)return red('/login?next=/club-admin/security-center/recovery-contacts');
       if(!ALLOWED.has(a.role))return deny('إدارة أرقام الاستعادة متاحة للرئيس والسكرتير ومدير النظام فقط.');
       if(m==='GET')return contactsPage(env.DB,a);
       if(m==='POST')return saveContacts(req,env.DB,a);
