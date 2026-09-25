@@ -20,17 +20,26 @@ jobs:
         run: |
           set -euo pipefail
           base="https://members.shamsphone.net"
-          for path in /membership /track-membership /club-admin /club-admin/command-center /club-admin/release-readiness; do
+
+          check_code() {
+            path="$1"
             code=$(curl -L --max-redirs 5 --connect-timeout 10 --max-time 30               --silent --show-error --output /dev/null --write-out '%{http_code}' "$base$path")
             echo "$path -> HTTP $code"
             if [ "$code" -ge 500 ] || [ "$code" -lt 200 ]; then
               echo "::error::$path returned HTTP $code"
               exit 1
             fi
-          done
+          }
 
-          curl -L --max-redirs 5 --connect-timeout 10 --max-time 30             --silent --show-error "$base/membership" | grep -q "متابعة الطلب والعضوية"
+          check_code /membership
+          check_code /track-membership
+          check_code /club-admin
+          check_code /club-admin/command-center
+          check_code /club-admin/release-readiness
 
-          curl -L --max-redirs 5 --connect-timeout 10 --max-time 30             --silent --show-error "$base/track-membership" | grep -q "متابعة الطلب والعضوية"
+          membership=$(curl -L --max-redirs 5 --connect-timeout 10 --max-time 30 --silent --show-error "$base/membership")
+          tracker=$(curl -L --max-redirs 5 --connect-timeout 10 --max-time 30 --silent --show-error "$base/track-membership")
 
+          printf '%s' "$membership" | grep -q "متابعة الطلب والعضوية"
+          printf '%s' "$tracker" | grep -q "متابعة الطلب والعضوية"
           echo "LIVE_SMOKE_OK"
