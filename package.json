@@ -1,0 +1,10 @@
+{
+  "name": "wadnofei-cloudflare-build-bootstrap",
+  "private": true,
+  "dependencies": {
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "wrangler": "^4.34.0"
+  }
+}

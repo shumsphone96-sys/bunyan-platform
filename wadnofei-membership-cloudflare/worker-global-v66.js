@@ -3,9 +3,9 @@ import app from './worker-global-v65.js';
 const CLUB='نادي ود نفيع الرياضي الثقافي الاجتماعي';
 const LOGO='/assets/wdn-logo-v42.jpg?v=49';
 const DEFAULT_TITLE='النظام الأساسي لنادي ود نفيع الرياضي الثقافي الاجتماعي';
-const DEFAULT_DESC='مشروع النظام الأساسي للنادي بصيغته النهائية المعدة للمراجعة والإجازة.';
+const DEFAULT_DESC='النظام الأساسي مجاز من الاتحاد المحلي لكرة القدم بالمناقل، وفي انتظار إجازة الجمعية العمومية.';
 const DEFAULT_VERSION='2026.1';
-const SEED_KEY='wdn-c2026-9f3a7e6c1b';
+const SEED_KEY_ENV='CONSTITUTION_SEED_KEY';
 const MAX_PDF=20*1024*1024;
 const CHUNK=128*1024;
 
@@ -18,7 +18,7 @@ export default {
     if(p==='/__wdn_constitution_seed_2026'&&m==='POST'&&env.DB){
       const s=await getSettings(env.DB);
       if(Number(s.seed_locked||0)===1 || Number(s.file_rev||0)>0) return new Response('Not found',{status:404});
-      if(u.searchParams.get('k')!==SEED_KEY) return new Response('Forbidden',{status:403});
+      if(!env[SEED_KEY_ENV]||req.headers.get('x-seed-key')!==env[SEED_KEY_ENV]) return new Response('Forbidden',{status:403});
       const bytes=new Uint8Array(await req.arrayBuffer());
       if(!isPdf(bytes)||bytes.byteLength>MAX_PDF) return new Response('Invalid PDF',{status:400});
       await storePdf(env.DB,bytes,'constitution-2026.pdf',true);
@@ -31,7 +31,8 @@ export default {
 
     if(p.startsWith('/club-admin/constitution')&&env.DB){
       const admin=await adminSession(req,env.DB);
-      if(!admin) return red('/login');
+      if(!admin) return red('/staff-login?next=/club-admin/constitution');
+      if(!canManageConstitution(admin)) return new Response('Forbidden',{status:403});
       if(p==='/club-admin/constitution'&&m==='GET') return constitutionAdmin(env.DB,admin);
       if(p==='/club-admin/constitution/settings'&&m==='POST'){
         if(!sameOrigin(req)) return new Response('Forbidden',{status:403});
@@ -89,7 +90,7 @@ async function ensure(db){
       version_label TEXT NOT NULL DEFAULT '2026.1',
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       download_enabled INTEGER NOT NULL DEFAULT 1,
-      published INTEGER NOT NULL DEFAULT 1,
+      published INTEGER NOT NULL DEFAULT 0,
       file_rev INTEGER DEFAULT 0,
       file_name TEXT,
       file_size INTEGER DEFAULT 0,
@@ -106,13 +107,13 @@ async function ensure(db){
     `CREATE TABLE IF NOT EXISTS club_audit_log(id INTEGER PRIMARY KEY AUTOINCREMENT,actor TEXT,action TEXT,entity_type TEXT,entity_id TEXT,details TEXT,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`
   ];
   for(const q of qs){try{await db.prepare(q).run()}catch(_){}}
-  try{await db.prepare(`INSERT OR IGNORE INTO club_constitution(id,title,description,status_code,version_label,download_enabled,published) VALUES(1,?,?,?,?,1,1)`).bind(DEFAULT_TITLE,DEFAULT_DESC,'review',DEFAULT_VERSION).run()}catch(_){}
+  try{await db.prepare(`INSERT OR IGNORE INTO club_constitution(id,title,description,status_code,version_label,download_enabled,published) VALUES(1,?,?,?,?,1,0)`).bind(DEFAULT_TITLE,DEFAULT_DESC,'review',DEFAULT_VERSION).run()}catch(_){}
 }
 
 async function getSettings(db){
   try{return await db.prepare(`SELECT * FROM club_constitution WHERE id=1`).first()||defaults()}catch(_){return defaults()}
 }
-function defaults(){return {id:1,title:DEFAULT_TITLE,description:DEFAULT_DESC,status_code:'review',approval_date:'',version_label:DEFAULT_VERSION,updated_at:'',download_enabled:1,published:1,file_rev:0,file_name:'constitution-2026.pdf',file_size:0,file_sha256:'',seed_locked:0}}
+function defaults(){return {id:1,title:DEFAULT_TITLE,description:DEFAULT_DESC,status_code:'review',approval_date:'',version_label:DEFAULT_VERSION,updated_at:'',download_enabled:1,published:0,file_rev:0,file_name:'constitution-2026.pdf',file_size:0,file_sha256:'',seed_locked:0}}
 
 async function storePdf(db,bytes,name,lockSeed=false){
   if(!isPdf(bytes)||bytes.byteLength>MAX_PDF) throw new Error('invalid_pdf');
@@ -166,7 +167,7 @@ async function constitutionPage(db){
   const updated=formatDate(s.updated_at);
   const approval=s.status_code==='approved'&&s.approval_date?`<span>تاريخ الاعتماد: ${esc(s.approval_date)}</span>`:'';
   const reader=hasFile?`<section id="reader" class="reader"><div class="readerTop"><b>قارئ النظام الأساسي</b><div><button type="button" onclick="zoomFrame(-1)">−</button><button type="button" onclick="zoomFrame(1)">+</button></div></div><div id="pdfBox" class="pdfBox"><iframe id="pdfFrame" title="النظام الأساسي لنادي ود نفيع" src="/constitution/file#toolbar=1&navpanes=0&view=FitH" loading="eager"></iframe></div><p class="readerHint">يمكنك استخدام أدوات قارئ PDF للتنقل بين الصفحات والتكبير والتصغير. على الهاتف استخدم زر ملء الشاشة لقراءة أوضح.</p></section>`:`<section class="empty">ملف PDF قيد التجهيز للنشر.</section>`;
-  const body=`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#061a43"><meta name="description" content="${escAttr(s.description||DEFAULT_DESC)}"><title>${esc(s.title)} · ${CLUB}</title><style>${constitutionCss()}</style></head><body><header><a href="/" class="brand"><img src="${LOGO}" alt="شعار نادي ود نفيع"><div><b>نادي ود نفيع</b><span>الرياضي الثقافي الاجتماعي</span></div></a><a href="/" class="back">الرئيسية</a></header><main><section class="bookHero"><img src="${LOGO}" alt="شعار نادي ود نفيع"><div><span class="tag">📘 وثيقة رسمية للنادي</span><h1>${esc(s.title)}</h1><p>${esc(s.description||DEFAULT_DESC)}</p><div class="state">${esc(status)}</div><div class="meta"><span>الإصدار: ${esc(s.version_label||DEFAULT_VERSION)}</span><span>آخر تحديث: ${esc(updated||'2026م')}</span>${approval}</div><div class="actions">${hasFile?'<a class="primary" href="#reader">قراءة النظام الأساسي</a>':''}${hasFile?'<button type="button" class="secondary" onclick="fullReader()">فتح بملء الشاشة</button>':''}${dl?'<a class="secondary" href="/constitution/download">تحميل PDF</a>':''}</div></div></section>${reader}</main><footer>${CLUB} · تأسس عام 1964</footer><script>let z=1;function fullReader(){const e=document.getElementById('pdfBox');if(!e)return;if(e.requestFullscreen)e.requestFullscreen();else window.open('/constitution/file','_blank')}function zoomFrame(d){z=Math.max(.7,Math.min(1.8,z+d*.15));const f=document.getElementById('pdfFrame');if(f){f.style.width=(100/z)+'%';f.style.height=(100/z)+'%';f.style.transform='scale('+z+')';f.style.transformOrigin='top right'}}</script></body></html>`;
+  const body=`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#061a43"><meta name="description" content="${escAttr(s.description||DEFAULT_DESC)}"><title>${esc(s.title)} · ${CLUB}</title><style>${constitutionCss()}</style></head><body><header><a href="/" class="brand"><img src="${LOGO}" alt="شعار نادي ود نفيع"><div><b>نادي ود نفيع</b><span>الرياضي الثقافي الاجتماعي</span></div></a><a href="/" class="back">الرئيسية</a></header><main><section class="bookHero"><img src="${LOGO}" alt="شعار نادي ود نفيع"><div><span class="tag">📘 وثيقة النادي</span><h1>${esc(s.title)}</h1><p>${esc(s.description||DEFAULT_DESC)}</p><div class="state">${esc(status)}</div><div class="meta"><span>الإصدار: ${esc(s.version_label||DEFAULT_VERSION)}</span><span>آخر تحديث: ${esc(updated||'2026م')}</span>${approval}</div><div class="actions">${hasFile?'<a class="primary" href="#reader">قراءة النظام الأساسي</a>':''}${hasFile?'<button type="button" class="secondary" onclick="fullReader()">فتح بملء الشاشة</button>':''}${dl?'<a class="secondary" href="/constitution/download">تحميل PDF</a>':''}</div></div></section>${reader}</main><footer>${CLUB}</footer><script>let z=1;function fullReader(){const e=document.getElementById('pdfBox');if(!e)return;if(e.requestFullscreen)e.requestFullscreen();else window.open('/constitution/file','_blank')}function zoomFrame(d){z=Math.max(.7,Math.min(1.8,z+d*.15));const f=document.getElementById('pdfFrame');if(f){f.style.width=(100/z)+'%';f.style.height=(100/z)+'%';f.style.transform='scale('+z+')';f.style.transformOrigin='top right'}}</script></body></html>`;
   return new Response(body,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff','referrer-policy':'same-origin','permissions-policy':'camera=(), microphone=(), geolocation=()','x-wadnofei-ui':'v66-constitution'}});
 }
 
@@ -202,7 +203,7 @@ async function uploadPdf(req,db,admin){
 
 async function adminSession(req,db){
   const c=req.headers.get('cookie')||'';
-  const sid=pickCookie(c,'staff_sid')||pickCookie(c,'sid')||pickCookie(c,'session');
+  const sid=pickCookie(c,'club_sid')||pickCookie(c,'staff_sid')||pickCookie(c,'sid')||pickCookie(c,'session');
   if(!sid)return null;
   const tries=[
     [`SELECT u.id,u.username,COALESCE(u.role,'staff') role FROM club_staff_sessions s JOIN club_staff_users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at>datetime('now')`,sid],
@@ -214,10 +215,11 @@ async function adminSession(req,db){
   return null;
 }
 
+function canManageConstitution(a){const r=String(a?.role||'').toLowerCase();return ['president','secretary','admin','owner','superadmin'].includes(r)}
 async function audit(db,a,action,type,id,details=''){try{await db.prepare(`INSERT INTO club_audit_log(actor,action,entity_type,entity_id,details) VALUES(?,?,?,?,?)`).bind(a?.username||'admin',action,type,String(id||''),details).run()}catch(_){}}
 function sameOrigin(req){const o=req.headers.get('origin');if(!o)return true;try{return o===new URL(req.url).origin}catch(_){return false}}
 function pickCookie(c,n){const m=c.match(new RegExp('(?:^|;\\s*)'+n+'=([^;]+)'));return m?decodeURIComponent(m[1]):''}
-function statusLabel(s){if(s.status_code==='approved')return s.approval_date?`معتمد – ${s.approval_date}`:'معتمد';if(s.status_code==='draft')return 'مسودة';return 'مشروع نهائي للمراجعة والإجازة – 2026م'}
+function statusLabel(s){if(s.status_code==='approved')return s.approval_date?`معتمد – ${s.approval_date}`:'معتمد';if(s.status_code==='draft')return 'مسودة';return 'مجاز من الاتحاد المحلي لكرة القدم بالمناقل – في انتظار إجازة الجمعية العمومية'}
 function formatDate(v){if(!v)return '';const s=String(v).replace('T',' ').replace('Z','');return s.slice(0,16)}
 function isPdf(b){return b&&b.length>=5&&String.fromCharCode(...b.subarray(0,5))==='%PDF-'}
 function toBase64(bytes){let s='';const step=0x8000;for(let i=0;i<bytes.length;i+=step)s+=String.fromCharCode(...bytes.subarray(i,Math.min(bytes.length,i+step)));return btoa(s)}
