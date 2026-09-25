@@ -15,31 +15,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Hit live membership pages
+      - name: Check live HTTP
         shell: bash
         run: |
           set -euo pipefail
           base="https://members.shamsphone.net"
-
-          check_code() {
-            path="$1"
+          for path in /membership /track-membership /club-admin /club-admin/command-center /club-admin/release-readiness; do
             code=$(curl -L --max-redirs 5 --connect-timeout 10 --max-time 30               --silent --show-error --output /dev/null --write-out '%{http_code}' "$base$path")
             echo "$path -> HTTP $code"
-            if [ "$code" -ge 500 ] || [ "$code" -lt 200 ]; then
-              echo "::error::$path returned HTTP $code"
-              exit 1
-            fi
-          }
+            test "$code" -ge 200
+            test "$code" -lt 500
+          done
 
-          check_code /membership
-          check_code /track-membership
-          check_code /club-admin
-          check_code /club-admin/command-center
-          check_code /club-admin/release-readiness
-
-          membership=$(curl -L --max-redirs 5 --connect-timeout 10 --max-time 30 --silent --show-error "$base/membership")
-          tracker=$(curl -L --max-redirs 5 --connect-timeout 10 --max-time 30 --silent --show-error "$base/track-membership")
-
-          printf '%s' "$membership" | grep -q "متابعة الطلب والعضوية"
-          printf '%s' "$tracker" | grep -q "متابعة الطلب والعضوية"
+      - name: Verify V73 public content
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL --connect-timeout 10 --max-time 30 "https://members.shamsphone.net/membership" | grep -q "متابعة الطلب والعضوية"
+          curl -fsSL --connect-timeout 10 --max-time 30 "https://members.shamsphone.net/track-membership" | grep -q "متابعة الطلب والعضوية"
           echo "LIVE_SMOKE_OK"
