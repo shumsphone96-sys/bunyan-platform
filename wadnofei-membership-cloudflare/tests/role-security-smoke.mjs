@@ -5,14 +5,14 @@ import {normalizeRole,classifyAdminPath,isAllowed} from '../role-policy.js';
 assert.equal(normalizeRole('finance_manager'),'finance');
 assert.equal(normalizeRole('secretary'),'secretary');
 assert.equal(normalizeRole('president'),'owner');
-assert.equal(normalizeRole('vice_president'),'vice_president');
+assert.equal(normalizeRole('vice_president'),'limited');
 
 assert.equal(isAllowed('finance_manager','finance','POST'),true);
 assert.equal(isAllowed('finance_manager','secretary','GET'),false);
-assert.equal(isAllowed('secretary','finance','GET'),true);
+assert.equal(isAllowed('secretary','finance','GET'),false);
 assert.equal(isAllowed('secretary','finance','POST'),false);
 assert.equal(isAllowed('secretary','secretary','POST'),true);
-assert.equal(isAllowed('vice_president','finance','GET'),true);
+assert.equal(isAllowed('vice_president','finance','GET'),false);
 assert.equal(isAllowed('vice_president','finance','POST'),false);
 assert.equal(isAllowed('president','owner','POST'),true);
 
@@ -38,6 +38,6 @@ assert.doesNotMatch(v71,/DELETE\s+FROM\s+(members|applications)/i);
 assert.match(v72,/recovery_contact_hash/);
 assert.match(v72,/DELETE FROM club_staff_sessions WHERE user_id=\?/);
 assert.match(v73,/release-readiness/);
-assert.match(index,/worker-global-v73\.js/);
+assert.match(index,/worker-global-v78\.js/);
 
 console.log('Role/security/privacy smoke tests passed.');
