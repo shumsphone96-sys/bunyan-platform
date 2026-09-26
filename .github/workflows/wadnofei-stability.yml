@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - wadnofei-stability-v1
+      - improve/wadnofei-site-review-20260926
     paths:
       - 'wadnofei-membership-cloudflare/**'
       - '.github/workflows/wadnofei-stability.yml'
@@ -22,6 +23,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - name: Check JavaScript syntax
         run: |
           set -e
@@ -34,21 +40,23 @@ jobs:
           node --check wadnofei-membership-cloudflare/worker-global-v72.js
           node --check wadnofei-membership-cloudflare/worker-global-v73.js
           node --check wadnofei-membership-cloudflare/src/index.js
+          for file in wadnofei-membership-cloudflare/worker-global-v7{4,5,6,7,8}.js wadnofei-membership-cloudflare/site-*.js wadnofei-membership-cloudflare/public-site.js; do node --check "$file"; done
 
       - name: Run role, security, and privacy smoke tests
         run: |
           set -e
           node wadnofei-membership-cloudflare/tests/role-security-smoke.mjs
+          node wadnofei-membership-cloudflare/tests/site-review.mjs
 
       - name: Verify active worker version
         run: |
-          grep -F "worker-global-v73.js" wadnofei-membership-cloudflare/src/index.js
+          grep -F "worker-global-v78.js" wadnofei-membership-cloudflare/src/index.js
 
       - name: Block destructive membership SQL in new layers
         run: |
           set -e
-          if grep -Eni "DROP[[:space:]]+TABLE|DELETE[[:space:]]+FROM[[:space:]]+(members|applications)|TRUNCATE"             wadnofei-membership-cloudflare/worker-global-v7{1,2,3}.js; then
-            echo "Destructive SQL detected in v71-v73"
+          if grep -Eni "DROP[[:space:]]+TABLE|DELETE[[:space:]]+FROM[[:space:]]+(members|applications)|TRUNCATE"             wadnofei-membership-cloudflare/worker-global-v7{1,2,3,4,5,6,7,8}.js wadnofei-membership-cloudflare/public-site.js; then
+            echo "Destructive membership SQL detected"
             exit 1
           fi
 
