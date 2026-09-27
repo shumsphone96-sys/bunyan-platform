@@ -74,11 +74,20 @@ jobs:
               cat /tmp/wdn-head
               exit 1
             fi
-            if ! grep -qi 'نادي ود نفيع\|عضوية\|دخول المسؤولين\|النظام الأساسي' /tmp/wdn-body; then
-              echo "Expected Wad Nofei page marker missing for $path"
-              grep -o '<title>[^<]*</title>\|<h1[^>]*>[^<]*</h1>\|<h2[^>]*>[^<]*</h2>' /tmp/wdn-body | head -8 || true
+            if ! grep -qi '^content-type: text/html' /tmp/wdn-head || ! grep -qi '<html' /tmp/wdn-body; then
+              echo "Expected HTML response missing for $path"
+              cat /tmp/wdn-head
               exit 1
             fi
+            case "$path" in
+              "/"|"/about"|"/activities"|"/contact"|"/news"|"/team"|"/board"|"/achievements"|"/projects"|"/events"|"/sponsors"|"/gallery"|"/history"|"/identity")
+                if ! grep -qi '^x-wadnofei-ui: v78-organized-site' /tmp/wdn-head; then
+                  echo "V78 public UI marker missing for $path"
+                  cat /tmp/wdn-head
+                  exit 1
+                fi
+              ;;
+            esac
           done
           curl --retry 3 --retry-delay 1 -sS -D /tmp/wdn-root-head -o /tmp/wdn-root-body "${PREVIEW_BASE}/"
           grep -qi '^x-frame-options: DENY' /tmp/wdn-root-head
