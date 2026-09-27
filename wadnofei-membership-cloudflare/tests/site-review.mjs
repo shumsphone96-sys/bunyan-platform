@@ -103,5 +103,6 @@ const worker=fs.readFileSync(new URL('../worker-global-v78.js',import.meta.url),
 check(worker.includes("app from './worker-global-v77.js'"),'existing authentication chain retained');
 check(worker.includes("path==='/membership/track'"),'pretty membership tracking route handled');
 check(worker.includes("target.pathname='/track-membership'"),'pretty membership tracking delegates to secure tracker');
+check(worker.includes("path==='/constitution'&&base.status===404"),'unpublished constitution gets a safe public status page');
 check(worker.includes('return app.scheduled(event,env,ctx)'),'scheduled notifications delegated');
 console.log('Site review passed: '+checks+' assertions across '+PUBLIC_PATHS.length+' public routes.');
