@@ -49,11 +49,20 @@ async function read(db,sql){
   return {rows:[],failed:true,reason};
  }
 }
+async function readNews(db,limit=50){
+ const n=Math.max(1,Math.min(50,Number(limit)||50));
+ const modern=await read(db,`SELECT title,body,category,created_at FROM club_news WHERE is_published=1 ORDER BY id DESC LIMIT ${n}`);
+ if(!modern.failed||!String(modern.reason).startsWith('missing-column-'))return modern;
+ // V9 created club_news with status instead of category/is_published. Read that
+ // legacy shape without changing production data; only explicitly published rows
+ // are surfaced. The prepared migration upgrades the schema after backup/restore.
+ return read(db,`SELECT title,body,'عام' AS category,created_at FROM club_news WHERE lower(trim(COALESCE(status,''))) IN ('published','active','approved') OR trim(COALESCE(status,'')) IN ('منشور','نشر') ORDER BY id DESC LIMIT ${n}`);
+}
 const services='<section class="wdn-services" aria-label="خدمات العضوية"><a class="wdn-service" href="/membership"><small>01 · انضم إلينا</small><strong>طلب عضوية جديدة ←</strong><span>قدّم بياناتك واحفظ رقم الطلب للمتابعة.</span></a><a class="wdn-service" href="/membership/track"><small>02 · تابع طلبك</small><strong>حالة طلب العضوية ←</strong><span>راجع مرحلة طلبك بالرقم والهاتف المسجل.</span></a><a class="wdn-service" href="/membership/payment"><small>03 · استكمل الإجراءات</small><strong>إشعار دفع أو مستند ←</strong><span>أرسل الإثبات لمراجعته من الحساب المختص.</span></a></section>';
 const areas='<div class="wdn-grid">'+card('الرياضة','رعاية المواهب والتدريب والمنافسات، وبناء بيئة تجمع الشباب حول الانضباط والعمل الجماعي.','01')+card('الثقافة','لقاءات وبرامج معرفية تفتح المجال للحوار وتبادل الخبرات والتواصل بين الأجيال.','02')+card('المجتمع','مبادرات وتطوع ومشاركة أهلية لخدمة الحي، بمساهمة أبناء ود نفيع في الداخل والخارج.','03')+'</div>';
 async function home(db){
  const [news,projects]=await Promise.all([
-  read(db,'SELECT title,body,category,created_at FROM club_news WHERE is_published=1 ORDER BY id DESC LIMIT 3'),
+  readNews(db,3),
   read(db,'SELECT title,summary,status FROM club_projects WHERE is_published=1 ORDER BY id DESC LIMIT 3')
  ]);
  const section=(t,p,data,render)=>data.rows.length?'<section class="wdn-section"><div class="wdn-section-head"><h2>'+t+'</h2><a href="'+p+'">عرض الكل ←</a></div><div class="wdn-grid">'+data.rows.map(render).join('')+'</div></section>':'';
@@ -85,7 +94,7 @@ async function publicColumnProfile(db,table){
  }catch{return ''}
 }
 async function collection(path,db){
- const [title,description,sql,render,message]=collections[path],data=await read(db,sql);
+ const [title,description,sql,render,message]=collections[path],data=path==='/news'?await readNews(db,50):await read(db,sql);
  const body=heading(title,description)+'<div class="wdn-wrap">'+(data.failed?'<div class="wdn-empty" role="alert"><h2>تعذر تحميل المحتوى</h2><p>أعد المحاولة بعد قليل.</p></div>':data.rows.length?'<div class="wdn-grid">'+data.rows.map(render).join('')+'</div>':empty(message))+'</div>';
  const response=page(title,description,body,path,data.failed?503:200);
  if(data.failed){
