@@ -1,9 +1,31 @@
 import {CLUB,LOGO,esc,page} from './site-ui.js';
+
+export const PUBLIC_SCHEMA_SQL=[
+ "CREATE TABLE IF NOT EXISTS club_news(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL,body TEXT,category TEXT DEFAULT 'عام',is_published INTEGER NOT NULL DEFAULT 1,created_by TEXT,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
+ "CREATE TABLE IF NOT EXISTS club_team(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,role TEXT,number TEXT,note TEXT,sort_order INTEGER DEFAULT 0,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
+ "CREATE TABLE IF NOT EXISTS club_board(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,position TEXT NOT NULL,note TEXT,sort_order INTEGER DEFAULT 0,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
+ "CREATE TABLE IF NOT EXISTS club_achievements(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL,achievement_date TEXT,details TEXT,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
+ "CREATE TABLE IF NOT EXISTS club_projects(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL,summary TEXT,status TEXT DEFAULT 'قيد التنفيذ',target TEXT,progress INTEGER DEFAULT 0,is_published INTEGER NOT NULL DEFAULT 1,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
+ "CREATE TABLE IF NOT EXISTS club_events(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL,event_date TEXT,location TEXT,details TEXT,is_published INTEGER NOT NULL DEFAULT 1,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
+ "CREATE TABLE IF NOT EXISTS club_sponsors(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,kind TEXT DEFAULT 'داعم',url TEXT,note TEXT,sort_order INTEGER DEFAULT 0,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
+ "CREATE TABLE IF NOT EXISTS club_gallery(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL,image_url TEXT NOT NULL,caption TEXT,sort_order INTEGER DEFAULT 0,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"
+];
+const schemaReady=new WeakMap();
+export async function ensurePublicSchema(db){
+ if(!db)return;
+ let pending=schemaReady.get(db);
+ if(!pending){
+  pending=(async()=>{for(const sql of PUBLIC_SCHEMA_SQL)await db.prepare(sql).run()})();
+  schemaReady.set(db,pending);
+ }
+ try{await pending}catch(err){schemaReady.delete(db);throw err}
+}
 // Public reads bypass legacy schema/bootstrap writes; no member/account data is changed.
 export const PUBLIC_PATHS=['/','/about','/activities','/contact','/news','/team','/board','/achievements','/projects','/events','/sponsors','/gallery','/history','/identity'];
 export async function publicSite(req,env){
  const path=new URL(req.url).pathname.replace(/\/$/,'')||'/';
  if(req.method!=='GET'||!PUBLIC_PATHS.includes(path))return null;
+ try{await ensurePublicSchema(env.DB)}catch{return page('الخدمة غير متاحة','تعذر تجهيز بيانات الموقع الآن. أعد المحاولة بعد قليل.','<div class="wdn-wrap"><div class="wdn-empty" role="alert"><h1>تعذر تجهيز الموقع</h1><p>أعد المحاولة بعد قليل.</p></div></div>',path,503)}
  if(path==='/')return home(env.DB);
  if(collections[path])return collection(path,env.DB);
  const [title,description,body]=staticPages[path];
