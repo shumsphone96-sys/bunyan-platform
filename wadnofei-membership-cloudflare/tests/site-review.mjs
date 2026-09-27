@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {PUBLIC_PATHS,PUBLIC_SCHEMA_SQL,PUBLIC_COMPAT_COLUMNS,publicSite,safeUrl} from '../public-site.js';
+import {PUBLIC_PATHS,PUBLIC_SCHEMA_SQL,publicSite,safeUrl} from '../public-site.js';
 import {polishForms} from '../site-forms.js';
 import {header,esc} from '../site-ui.js';
 let checks=0;
@@ -8,10 +8,6 @@ function check(ok,label){assert.ok(ok,label);checks++}
 function db(rows=[],fail=false){
  return {prepare(sql){
   check(!/\b(members|applications|club_staff_users|club_staff_sessions|sessions)\b/i.test(sql),'public layer never touches private tables');
-  if(/^ALTER TABLE club_[a-z_]+ ADD COLUMN [a-z_]+ /i.test(sql)){
-   check(!/\b(DROP|DELETE|UPDATE|INSERT|TRUNCATE|REPLACE)\b/i.test(sql),'compat migration is additive only');
-   return {async run(){return {success:true}}};
-  }
   check(!/\b(DROP|ALTER|DELETE|UPDATE|INSERT|TRUNCATE|REPLACE)\b/i.test(sql),'public schema/read path has no destructive or data-changing SQL');
   if(/^CREATE TABLE IF NOT EXISTS\s/i.test(sql)){
    return {async run(){return {success:true}}};
@@ -24,14 +20,6 @@ function db(rows=[],fail=false){
   if(/\bclub_news\b/.test(sql)&&/\bstatus\b/i.test(sql))check(/published|منشور/.test(sql),'legacy news fallback still filters publication status');
   return {async all(){if(fail)throw Error('unavailable');return {results:rows}}};
  }};
-}
-check(Object.keys(PUBLIC_COMPAT_COLUMNS).length===8,'compat migration is limited to public CMS tables');
-for(const [table,columns] of Object.entries(PUBLIC_COMPAT_COLUMNS)){
- check(/^club_(news|team|board|achievements|projects|events|sponsors|gallery)$/.test(table),'compat table allowlist');
- for(const [column,definition] of Object.entries(columns)){
-  check(/^[a-z_]+$/.test(column),'compat column name is static');
-  check(!/\b(DROP|DELETE|UPDATE|INSERT|TRUNCATE|REPLACE)\b/i.test(definition),'compat definition is additive only');
- }
 }
 check(PUBLIC_SCHEMA_SQL.length===8,'exact public CMS table set');
 for(const sql of PUBLIC_SCHEMA_SQL){
