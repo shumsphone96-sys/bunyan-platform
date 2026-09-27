@@ -39,7 +39,13 @@ async function read(db,sql){
  if(!db)return {rows:[],failed:true,reason:'db-unbound'};
  try{const r=await db.prepare(sql).all();return {rows:r.results||[],failed:false,reason:''}}catch(err){
   const message=String(err?.message||err||'');
-  const reason=/no such table/i.test(message)?'missing-table':/no such column/i.test(message)?'missing-column':'db-error';
+  let reason=/no such table/i.test(message)?'missing-table':/no such column/i.test(message)?'missing-column':'db-error';
+  if(reason==='missing-column'){
+   const match=message.match(/no such column:\s*(?:\w+\.)?([A-Za-z_][A-Za-z0-9_]*)/i);
+   const column=match?.[1]||'';
+   const allowed=new Set(['id','title','body','category','created_at','is_published','name','role','number','note','sort_order','position','details','achievement_date','summary','status','progress','event_date','location','kind','url','image_url','caption']);
+   if(allowed.has(column))reason+='-'+column;
+  }
   return {rows:[],failed:true,reason};
  }
 }
