@@ -25,6 +25,10 @@ for(const path of PUBLIC_PATHS){
  check(html.includes('href="https://members.shamsphone.net'+path+'"'),path+' canonical');
  for(const match of html.matchAll(/href="(\/[^"]*)"/g))check(knownLinks.has(match[1]),path+' known navigation target '+match[1]);
 }
+response=await publicSite(new Request('https://members.shamsphone.net/'),{DB:db()});
+check(response.headers.get('x-frame-options')==='DENY','public pages deny framing');
+check((response.headers.get('content-security-policy')||'').includes("frame-ancestors 'none'"),'public CSP blocks framing');
+check((response.headers.get('permissions-policy')||'').includes('camera=()'),'public permissions policy disables camera');
 check(await publicSite(new Request('https://members.shamsphone.net/membership'),{DB:db()})===null,'membership delegated');
 check(await publicSite(new Request('https://members.shamsphone.net/',{method:'POST'}),{DB:db()})===null,'mutations delegated');
 check(await publicSite(new Request('https://members.shamsphone.net/club-admin'),{DB:db()})===null,'admin delegated');
@@ -57,6 +61,12 @@ check(!html.includes('wdn71-public'),'duplicate tracking removed');
 check((html.match(/<header\b/g)||[]).length===1,'one form header');
 check((html.match(/<footer\b/g)||[]).length===1,'one form footer');
 check(html.includes('id="wdn-main"'),'form skip target');
+const existingMain='<!doctype html><html><head></head><body><main id="legacy-main" tabindex="0" class="legacy"><p>اختبار</p></main></body></html>';
+const normalized=polishForms(existingMain,'/membership/track');
+check((normalized.match(/id="wdn-main"/g)||[]).length===1,'existing main id normalized once');
+check(!normalized.includes('legacy-main'),'legacy main id removed');
+check((normalized.match(/tabindex="-1"/g)||[]).length===1,'main tabindex normalized once');
+
 html=polishForms('<html><head></head><body><main><p><a href="/staff-recover">استعادة</a></p><p><a href="/forgot-account">استعادة</a></p></main></body></html>','/login');
 check(!html.includes('href="/forgot-account"'),'duplicate recovery removed');
 check(html.includes('href="/staff-recover"'),'staff recovery retained');
