@@ -311,19 +311,17 @@ async function ensureRecoverySchema(db){
 }
 
 async function seedAcceptedRecoveryMappings(db){
+ const secretary=await db.prepare("SELECT id FROM club_staff_users WHERE role='secretary' AND is_active=1 LIMIT 1").first();
+ if(!secretary)return;
  const mappings=[
-  ['secretary','email','94e557479957a1f58c117131011cc829f5fd881373ada7aaf25d3de855861717','sh***@hotmail.com'],
-  ['finance_manager','whatsapp','773e918027070e56c868f73ef5891918c9b016fc3b52d1252074931789dfce8f','•••• 3242'],
-  ['president','sms','a677ffc183e29d0276200187a09c0c41fbbb2fe416ae2091ecc18e39bd5c88dc','•••• 9004']
+  ['email','94e557479957a1f58c117131011cc829f5fd881373ada7aaf25d3de855861717','sh***@hotmail.com'],
+  ['whatsapp','773e918027070e56c868f73ef5891918c9b016fc3b52d1252074931789dfce8f','•••• 3242'],
+  ['sms','a677ffc183e29d0276200187a09c0c41fbbb2fe416ae2091ecc18e39bd5c88dc','•••• 9004']
  ];
- for(const [role,kind,hash,hint] of mappings){
+ for(const [kind,hash,hint] of mappings){
   try{
-   let u=await db.prepare("SELECT id FROM club_staff_users WHERE role=? AND is_active=1 LIMIT 1").bind(role).first();
-   if(!u&&role==='finance_manager')u=await db.prepare("SELECT id FROM club_staff_users WHERE role='finance' AND is_active=1 LIMIT 1").first();
-   if(!u)continue;
-   const conflict=await db.prepare("SELECT user_id FROM club_staff_recovery_methods WHERE contact_hash=? AND is_active=1 LIMIT 1").bind(hash).first();
-   if(conflict&&Number(conflict.user_id)!==Number(u.id))continue;
-   await upsertRecoveryMethod(db,u.id,kind,hash,hint);
+   await db.prepare("DELETE FROM club_staff_recovery_methods WHERE contact_hash=? AND user_id<>?").bind(hash,secretary.id).run();
+   await upsertRecoveryMethod(db,secretary.id,kind,hash,hint);
   }catch(_){}
  }
 }
