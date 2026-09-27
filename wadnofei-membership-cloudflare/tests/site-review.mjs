@@ -12,6 +12,9 @@ function db(rows=[],fail=false){
   if(/^CREATE TABLE IF NOT EXISTS\s/i.test(sql)){
    return {async run(){return {success:true}}};
   }
+  if(/^PRAGMA table_info\(club_[a-z_]+\)$/i.test(sql)){
+   return {async all(){return {results:[]}}};
+  }
   check(/^SELECT\s/i.test(sql),'public data query must be SELECT');
   if(/\b(club_news|club_projects|club_events)\b/.test(sql))check(/is_published=1/.test(sql),'publication filter required');
   return {async all(){if(fail)throw Error('unavailable');return {results:rows}}};
