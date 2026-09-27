@@ -54,6 +54,29 @@ jobs:
           node wadnofei-membership-cloudflare/tests/role-security-smoke.mjs
           node wadnofei-membership-cloudflare/tests/site-review.mjs
 
+      - name: Smoke test Cloudflare branch preview
+        env:
+          PREVIEW_BASE: https://improve-wadnofei-site-review-20260926-wadnofei-membership.shumsphone96.workers.dev
+        run: |
+          set -euo pipefail
+          public_paths=(
+            "/" "/about" "/activities" "/contact" "/news" "/team" "/board"
+            "/achievements" "/projects" "/events" "/sponsors" "/gallery"
+            "/history" "/identity" "/constitution" "/membership"
+            "/membership/track" "/membership/payment" "/staff-login" "/staff-recover"
+          )
+          for path in "${public_paths[@]}"; do
+            code="$(curl --retry 3 --retry-delay 1 -L -sS -o /tmp/wdn-body -D /tmp/wdn-head -w '%{http_code}' "${PREVIEW_BASE}${path}")"
+            test "$code" = "200" || { echo "Unexpected HTTP $code for $path"; cat /tmp/wdn-head; exit 1; }
+            grep -qi '^x-content-type-options: nosniff' /tmp/wdn-head
+            grep -qi 'نادي ود نفيع\|عضوية\|دخول المسؤولين\|النظام الأساسي' /tmp/wdn-body
+          done
+          curl --retry 3 --retry-delay 1 -sS -D /tmp/wdn-root-head -o /tmp/wdn-root-body "${PREVIEW_BASE}/"
+          grep -qi '^x-frame-options: DENY' /tmp/wdn-root-head
+          grep -qi '^content-security-policy: .*frame-ancestors' /tmp/wdn-root-head
+          admin_code="$(curl --retry 3 --retry-delay 1 -sS -o /dev/null -w '%{http_code}' "${PREVIEW_BASE}/club-admin/access/passwords")"
+          case "$admin_code" in 302|303) ;; *) echo "Protected admin route returned HTTP $admin_code"; exit 1;; esac
+
       - name: Verify active worker version
         run: |
           grep -F "worker-global-v78.js" wadnofei-membership-cloudflare/src/index.js
