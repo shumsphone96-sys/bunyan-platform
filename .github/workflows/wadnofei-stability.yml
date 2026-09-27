@@ -66,10 +66,19 @@ jobs:
             "/membership/track" "/membership/payment" "/staff-login" "/staff-recover"
           )
           for path in "${public_paths[@]}"; do
+            echo "Checking preview route: $path"
             code="$(curl --retry 3 --retry-delay 1 -L -sS -o /tmp/wdn-body -D /tmp/wdn-head -w '%{http_code}' "${PREVIEW_BASE}${path}")"
             test "$code" = "200" || { echo "Unexpected HTTP $code for $path"; cat /tmp/wdn-head; grep -o '<h1[^>]*>[^<]*</h1>\|<h2[^>]*>[^<]*</h2>' /tmp/wdn-body | head -5 || true; exit 1; }
-            grep -qi '^x-content-type-options: nosniff' /tmp/wdn-head
-            grep -qi 'نادي ود نفيع\|عضوية\|دخول المسؤولين\|النظام الأساسي' /tmp/wdn-body
+            if ! grep -qi '^x-content-type-options: nosniff' /tmp/wdn-head; then
+              echo "Missing nosniff header for $path"
+              cat /tmp/wdn-head
+              exit 1
+            fi
+            if ! grep -qi 'نادي ود نفيع\|عضوية\|دخول المسؤولين\|النظام الأساسي' /tmp/wdn-body; then
+              echo "Expected Wad Nofei page marker missing for $path"
+              grep -o '<title>[^<]*</title>\|<h1[^>]*>[^<]*</h1>\|<h2[^>]*>[^<]*</h2>' /tmp/wdn-body | head -8 || true
+              exit 1
+            fi
           done
           curl --retry 3 --retry-delay 1 -sS -D /tmp/wdn-root-head -o /tmp/wdn-root-body "${PREVIEW_BASE}/"
           grep -qi '^x-frame-options: DENY' /tmp/wdn-root-head
