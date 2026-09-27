@@ -36,8 +36,12 @@ function heading(t,d){return '<section class="wdn-pagehead"><div class="wdn-brea
 function card(t,b,l=''){return '<article class="wdn-card">'+(l?'<span class="wdn-label">'+esc(l)+'</span>':'')+'<h3>'+esc(t)+'</h3><p>'+esc(b)+'</p></article>'}
 function empty(message){return '<div class="wdn-empty"><p>'+esc(message)+'</p></div>'}
 async function read(db,sql){
- if(!db)return {rows:[],failed:true};
- try{const r=await db.prepare(sql).all();return {rows:r.results||[],failed:false}}catch{return {rows:[],failed:true}}
+ if(!db)return {rows:[],failed:true,reason:'db-unbound'};
+ try{const r=await db.prepare(sql).all();return {rows:r.results||[],failed:false,reason:''}}catch(err){
+  const message=String(err?.message||err||'');
+  const reason=/no such table/i.test(message)?'missing-table':/no such column/i.test(message)?'missing-column':'db-error';
+  return {rows:[],failed:true,reason};
+ }
 }
 const services='<section class="wdn-services" aria-label="خدمات العضوية"><a class="wdn-service" href="/membership"><small>01 · انضم إلينا</small><strong>طلب عضوية جديدة ←</strong><span>قدّم بياناتك واحفظ رقم الطلب للمتابعة.</span></a><a class="wdn-service" href="/membership/track"><small>02 · تابع طلبك</small><strong>حالة طلب العضوية ←</strong><span>راجع مرحلة طلبك بالرقم والهاتف المسجل.</span></a><a class="wdn-service" href="/membership/payment"><small>03 · استكمل الإجراءات</small><strong>إشعار دفع أو مستند ←</strong><span>أرسل الإثبات لمراجعته من الحساب المختص.</span></a></section>';
 const areas='<div class="wdn-grid">'+card('الرياضة','رعاية المواهب والتدريب والمنافسات، وبناء بيئة تجمع الشباب حول الانضباط والعمل الجماعي.','01')+card('الثقافة','لقاءات وبرامج معرفية تفتح المجال للحوار وتبادل الخبرات والتواصل بين الأجيال.','02')+card('المجتمع','مبادرات وتطوع ومشاركة أهلية لخدمة الحي، بمساهمة أبناء ود نفيع في الداخل والخارج.','03')+'</div>';
@@ -64,7 +68,9 @@ const collections={
 async function collection(path,db){
  const [title,description,sql,render,message]=collections[path],data=await read(db,sql);
  const body=heading(title,description)+'<div class="wdn-wrap">'+(data.failed?'<div class="wdn-empty" role="alert"><h2>تعذر تحميل المحتوى</h2><p>أعد المحاولة بعد قليل.</p></div>':data.rows.length?'<div class="wdn-grid">'+data.rows.map(render).join('')+'</div>':empty(message))+'</div>';
- return page(title,description,body,path,data.failed?503:200);
+ const response=page(title,description,body,path,data.failed?503:200);
+ if(data.failed)response.headers.set('x-wadnofei-data-state',data.reason||'db-error');
+ return response;
 }
 const staticPages={
  '/about':['عن النادي','نادي رياضي ثقافي اجتماعي يجمع أبناء ود نفيع ومحبيها منذ عام 1964.','<section class="wdn-reading"><h2>انتماء يتحول إلى مشاركة</h2><p>يحمل النادي تاريخ الحي ويعمل ليكون مساحة جامعة للشباب والأسر وأبناء ود نفيع في الداخل والخارج. تمتد رسالته إلى الرياضة والثقافة والعمل الاجتماعي.</p><p>نؤمن بالعمل الجماعي، وحفظ حقوق الأعضاء، واحترام الاختصاصات، وتوثيق العمل بما يحفظ ذاكرة النادي وأصوله للأجيال القادمة.</p></section><section class="wdn-section">'+areas+'</section><section class="wdn-band"><div><h2>كن جزءاً من النادي</h2><p>ابدأ بطلب العضوية، وتابع إجراءاته حتى المراجعة والاعتماد.</p></div><a href="/membership" class="wdn-button">طلب العضوية</a></section>'],
