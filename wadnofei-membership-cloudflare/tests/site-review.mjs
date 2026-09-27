@@ -64,5 +64,7 @@ check(header('/news').includes('href="/news" aria-current="page"'),'active page 
 check(esc('<>&"')==='&lt;&gt;&amp;&quot;','HTML escaping');
 const worker=fs.readFileSync(new URL('../worker-global-v78.js',import.meta.url),'utf8');
 check(worker.includes("app from './worker-global-v77.js'"),'existing authentication chain retained');
+check(worker.includes("path==='/membership/track'"),'pretty membership tracking route handled');
+check(worker.includes("target.pathname='/track-membership'"),'pretty membership tracking delegates to secure tracker');
 check(worker.includes('return app.scheduled(event,env,ctx)'),'scheduled notifications delegated');
 console.log('Site review passed: '+checks+' assertions across '+PUBLIC_PATHS.length+' public routes.');
