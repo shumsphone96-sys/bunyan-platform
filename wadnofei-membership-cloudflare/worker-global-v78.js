@@ -7,7 +7,12 @@ export default {
   if(req.method==='GET'&&path==='/club')return new Response(null,{status:302,headers:{location:'/', 'cache-control':'no-store'}});
   const response=await publicSite(req,env);
   if(response)return response;
-  const base=await app.fetch(req,env,ctx);
+  let delegated=req;
+  if(path==='/membership/track'){
+   const target=new URL(req.url);target.pathname='/track-membership';
+   delegated=new Request(target.toString(),req);
+  }
+  const base=await app.fetch(delegated,env,ctx);
   if(!base.headers.get('content-type')?.includes('text/html')||(!FORM_PATHS.has(path)&&path!=='/constitution'))return base;
   const html=polishForms(await base.text(),path);
   const headers=new Headers(base.headers);headers.delete('content-length');headers.set('x-wadnofei-ui','v78-organized-site');
