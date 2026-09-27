@@ -57,6 +57,6 @@ check(!/club_staff_recovery_methods[\s\S]{0,400}\b(phone|email)\s+TEXT/i.test(sc
 check(code.includes('normalizePhone')&&code.includes("'249'+d.slice(1)"),'Sudan local phone numbers normalize to country code for delivery');
 check(code.includes('validEmail'),'email addresses are validated');
 check(code.includes('contact_hash=? AND user_id<>?'),'duplicate recovery contact ownership is rejected');
-check(code.includes('normalizeRole(actor.role)!==\\'owner\\''),'only the manager can configure other staff accounts');
+check(code.includes("normalizeRole(actor.role)!=='owner'"),'only the manager can configure other staff accounts');
 
 console.log('V79 auth/recovery review passed: '+checks+' assertions.');
