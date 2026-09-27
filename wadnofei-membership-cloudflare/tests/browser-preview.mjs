@@ -44,6 +44,16 @@ try{
      const r=el.getBoundingClientRect();
      return r.width>0&&(r.left < -2 || r.right > vw+2);
     }).length;
+    const overflowElements=[...document.querySelectorAll('body *')].map(el=>{
+     const r=el.getBoundingClientRect();
+     return {
+      tag:el.tagName.toLowerCase(),
+      id:el.id||'',
+      cls:String(el.className||'').slice(0,120),
+      left:Math.round(r.left),right:Math.round(r.right),width:Math.round(r.width),
+      text:String(el.textContent||'').trim().replace(/\s+/g,' ').slice(0,90)
+     };
+    }).filter(x=>x.width>0&&(x.left < -2 || x.right > vw+2)).slice(0,12);
     return {
      html:document.documentElement.tagName==='HTML',
      rtl:document.documentElement.dir==='rtl'||getComputedStyle(document.body).direction==='rtl',
@@ -52,7 +62,8 @@ try{
      footer:!!footer,
      mainIds:document.querySelectorAll('#wdn-main').length,
      overflow:document.documentElement.scrollWidth-vw,
-     overflowFields
+     overflowFields,
+     overflowElements
     };
    });
    assert.ok(metrics.html,profile+' '+route+' HTML document'); checks++;
@@ -61,6 +72,7 @@ try{
    assert.ok(metrics.header,profile+' '+route+' header'); checks++;
    assert.ok(metrics.footer,profile+' '+route+' footer'); checks++;
    assert.equal(metrics.mainIds,1,profile+' '+route+' one main id'); checks++;
+   if(metrics.overflow>2)console.error('Overflow diagnostics',profile,route,JSON.stringify(metrics.overflowElements));
    assert.ok(metrics.overflow<=2,profile+' '+route+' no horizontal page overflow: '+metrics.overflow+'px'); checks++;
    assert.equal(metrics.overflowFields,0,profile+' '+route+' form controls stay inside viewport'); checks++;
   }
