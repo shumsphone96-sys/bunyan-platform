@@ -315,17 +315,26 @@ async function ensureRecoverySchema(db){
 async function seedAcceptedRecoveryMappings(db){
  const secretary=await db.prepare("SELECT id FROM club_staff_users WHERE role='secretary' AND is_active=1 LIMIT 1").first();
  if(!secretary)return;
- const mappings=[
-  ['email','94e557479957a1f58c117131011cc829f5fd881373ada7aaf25d3de855861717','sh***@hotmail.com'],
-  ['whatsapp','773e918027070e56c868f73ef5891918c9b016fc3b52d1252074931789dfce8f','•••• 3242'],
-  ['sms','a677ffc183e29d0276200187a09c0c41fbbb2fe416ae2091ecc18e39bd5c88dc','•••• 9004']
- ];
- for(const [kind,hash,hint] of mappings){
-  try{
-   await db.prepare("DELETE FROM club_staff_recovery_methods WHERE contact_hash=? AND user_id<>?").bind(hash,secretary.id).run();
-   await upsertRecoveryMethod(db,secretary.id,kind,hash,hint);
-  }catch(_){}
- }
+ const emailHash='94e557479957a1f58c117131011cc829f5fd881373ada7aaf25d3de855861717';
+ const phoneHash='a677ffc183e29d0276200187a09c0c41fbbb2fe416ae2091ecc18e39bd5c88dc';
+ const oldWhatsappHash='773e918027070e56c868f73ef5891918c9b016fc3b52d1252074931789dfce8f';
+ try{
+  await db.prepare("DELETE FROM club_staff_recovery_methods WHERE contact_hash=?").bind(oldWhatsappHash).run();
+ }catch(_){}
+ try{
+  await db.prepare("DELETE FROM club_staff_recovery_methods WHERE contact_hash=? AND user_id<>?").bind(emailHash,secretary.id).run();
+  await upsertRecoveryMethod(db,secretary.id,'email',emailHash,'sh***@hotmail.com');
+ }catch(_){}
+ try{
+  await db.prepare("DELETE FROM club_staff_recovery_methods WHERE user_id=? AND kind IN ('whatsapp','sms','phone') AND contact_hash<>?").bind(secretary.id,phoneHash).run();
+  await db.prepare("DELETE FROM club_staff_recovery_methods WHERE contact_hash=? AND user_id<>?").bind(phoneHash,secretary.id).run();
+  const existing=await db.prepare("SELECT id FROM club_staff_recovery_methods WHERE contact_hash=? LIMIT 1").bind(phoneHash).first();
+  if(existing){
+   await db.prepare("UPDATE club_staff_recovery_methods SET user_id=?,kind='phone',contact_hint='•••• 9004',is_active=1,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(secretary.id,existing.id).run();
+  }else{
+   await upsertRecoveryMethod(db,secretary.id,'phone',phoneHash,'•••• 9004');
+  }
+ }catch(_){}
 }
 
 function capabilities(env){
