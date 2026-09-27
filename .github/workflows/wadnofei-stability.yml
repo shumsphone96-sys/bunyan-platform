@@ -28,13 +28,11 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install Worker dependencies
-        working-directory: wadnofei-membership-cloudflare
+      - name: Install deployment dependencies
         run: npm install --no-audit --no-fund
 
-      - name: Bundle Worker with Wrangler
-        working-directory: wadnofei-membership-cloudflare
-        run: npx wrangler deploy --dry-run --outdir .wrangler-dry-run
+      - name: Bundle Worker through deployment config
+        run: npx wrangler deploy --dry-run --outdir wadnofei-membership-cloudflare/.wrangler-dry-run
 
       - name: Check JavaScript syntax
         run: |
