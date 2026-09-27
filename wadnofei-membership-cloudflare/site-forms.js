@@ -3,7 +3,7 @@ export const FORM_PATHS=new Set(['/membership','/membership/join','/membership/t
 export function polishForms(html,path){
  html=html.replace(/<header\b[^>]*>[\s\S]*?<\/header>/i,'').replace(/<footer\b[^>]*>[\s\S]*?<\/footer>/i,'');
  html=html.replace(/<body([^>]*)>/i,'<body$1>'+header(path)).replace('</body>',footer()+'</body>');
- html=html.replace(/<main([^>]*)>/i,'<main id="wdn-main" tabindex="-1"$1>');
+ html=html.replace(/<main([^>]*)>/i,(_,attrs)=>'<main id="wdn-main" tabindex="-1"'+String(attrs||'').replace(/\s(?:id|tabindex)=("[^"]*"|'[^']*'|[^\s>]+)/gi,'')+'>');
  if(['/membership','/membership/join'].includes(path)){
   html=html.replace(/<section\b[^>]*><h2[^>]*>متابعة إجراءات العضوية<\/h2>[\s\S]*?<\/section>/g,'');
   html=html.replace(/<section class="wdn71-public">[\s\S]*?<\/section>/g,'');
