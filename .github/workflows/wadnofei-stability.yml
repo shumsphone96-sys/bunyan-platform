@@ -67,7 +67,7 @@ jobs:
           )
           for path in "${public_paths[@]}"; do
             code="$(curl --retry 3 --retry-delay 1 -L -sS -o /tmp/wdn-body -D /tmp/wdn-head -w '%{http_code}' "${PREVIEW_BASE}${path}")"
-            test "$code" = "200" || { echo "Unexpected HTTP $code for $path"; cat /tmp/wdn-head; exit 1; }
+            test "$code" = "200" || { echo "Unexpected HTTP $code for $path"; cat /tmp/wdn-head; grep -o '<h1[^>]*>[^<]*</h1>\|<h2[^>]*>[^<]*</h2>' /tmp/wdn-body | head -5 || true; exit 1; }
             grep -qi '^x-content-type-options: nosniff' /tmp/wdn-head
             grep -qi 'نادي ود نفيع\|عضوية\|دخول المسؤولين\|النظام الأساسي' /tmp/wdn-body
           done
