@@ -115,7 +115,7 @@ async function requestOtp(req,env){
   }else{
    try{await env.DB.prepare("UPDATE club_staff_otp SET consumed_at=CURRENT_TIMESTAMP WHERE id=?").bind(id).run()}catch(_){}
    await audit(env.DB,'public','otp_send_failed','staff_user',user.id,channel);
-   return recoverStart(env,'تعذر إرسال الرمز عبر القناة المختارة الآن. جرّب قناة أخرى أو أعد المحاولة لاحقاً.');
+   return recoverVerify(id,'إذا كانت البيانات مطابقة وتمكن مزود الإرسال من قبول الطلب فسيصل الرمز. إذا لم يصل، اطلب رمزاً جديداً أو جرّب قناة أخرى.');
   }
  }
  return recoverVerify(id,'إذا كانت البيانات مطابقة لحساب مسجل فقد أُرسل رمز مكوّن من 6 أرقام. الرمز صالح لمدة 10 دقائق.');
@@ -425,7 +425,8 @@ function securityHeaders(){
   'x-frame-options':'DENY',
   'referrer-policy':'strict-origin-when-cross-origin',
   'permissions-policy':'camera=(), microphone=(), geolocation=()',
-  'content-security-policy':"default-src 'self'; img-src 'self' https:; style-src 'unsafe-inline'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; connect-src 'self' https://graph.facebook.com https://api.brevo.com"
+  'content-security-policy':"default-src 'self'; img-src 'self' https:; style-src 'unsafe-inline'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; connect-src 'self'",
+  'x-wadnofei-auth':'v79-otp-recovery'
  };
 }
 
