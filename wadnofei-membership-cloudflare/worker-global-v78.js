@@ -24,7 +24,7 @@ export default {
   }
   if(!base.headers.get('content-type')?.includes('text/html')||(!FORM_PATHS.has(path)&&path!=='/constitution'))return base;
   const html=polishForms(await base.text(),path);
-  const headers=new Headers(base.headers);headers.delete('content-length');headers.set('x-wadnofei-ui','v78-organized-site');
+  const headers=new Headers(base.headers);headers.delete('content-length');headers.set('x-wadnofei-ui','v78-organized-site');headers.set('cache-control','no-store');headers.set('x-content-type-options','nosniff');headers.set('x-frame-options','DENY');headers.set('referrer-policy','strict-origin-when-cross-origin');headers.set('permissions-policy','camera=(), microphone=(), geolocation=()');
   return new Response(html,{status:base.status,statusText:base.statusText,headers});
  },
  async scheduled(event,env,ctx){if(app.scheduled)return app.scheduled(event,env,ctx)}
