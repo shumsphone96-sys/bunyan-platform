@@ -1,17 +1,27 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {PUBLIC_PATHS,publicSite,safeUrl} from '../public-site.js';
+import {PUBLIC_PATHS,PUBLIC_SCHEMA_SQL,publicSite,safeUrl} from '../public-site.js';
 import {polishForms} from '../site-forms.js';
 import {header,esc} from '../site-ui.js';
 let checks=0;
 function check(ok,label){assert.ok(ok,label);checks++}
 function db(rows=[],fail=false){
  return {prepare(sql){
-  check(/^SELECT\s/i.test(sql),'public SQL must be read-only');
-  check(!/\b(members|applications|club_staff_users|sessions)\b/i.test(sql),'no private table reads');
+  check(!/\b(members|applications|club_staff_users|club_staff_sessions|sessions)\b/i.test(sql),'public layer never touches private tables');
+  check(!/\b(DROP|ALTER|DELETE|UPDATE|INSERT|TRUNCATE|REPLACE)\b/i.test(sql),'public schema/read path has no destructive or data-changing SQL');
+  if(/^CREATE TABLE IF NOT EXISTS\s/i.test(sql)){
+   return {async run(){return {success:true}}};
+  }
+  check(/^SELECT\s/i.test(sql),'public data query must be SELECT');
   if(/\b(club_news|club_projects|club_events)\b/.test(sql))check(/is_published=1/.test(sql),'publication filter required');
   return {async all(){if(fail)throw Error('unavailable');return {results:rows}}};
  }};
+}
+check(PUBLIC_SCHEMA_SQL.length===8,'exact public CMS table set');
+for(const sql of PUBLIC_SCHEMA_SQL){
+ check(/^CREATE TABLE IF NOT EXISTS\s+club_/i.test(sql),'public schema is idempotent club table creation');
+ check(!/\b(members|applications|club_staff_users|club_staff_sessions|sessions)\b/i.test(sql),'public schema excludes private tables');
+ check(!/\b(DROP|ALTER|DELETE|UPDATE|INSERT|TRUNCATE|REPLACE)\b/i.test(sql),'public schema has no destructive or data-changing SQL');
 }
 const knownLinks=new Set([...PUBLIC_PATHS,'/constitution','/membership','/membership/track','/membership/payment','/staff-login']);
 for(const path of PUBLIC_PATHS){
