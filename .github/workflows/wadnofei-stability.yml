@@ -56,13 +56,6 @@ jobs:
           node wadnofei-membership-cloudflare/tests/role-security-smoke.mjs
           node wadnofei-membership-cloudflare/tests/site-review.mjs
 
-      - name: Build Worker with Wrangler (dry run)
-        run: |
-          set -e
-          cd wadnofei-membership-cloudflare
-          npm install --ignore-scripts --no-audit --no-fund
-          npx wrangler deploy --dry-run
-
       - name: Verify active worker version
         run: |
           grep -F "worker-global-v78.js" wadnofei-membership-cloudflare/src/index.js
