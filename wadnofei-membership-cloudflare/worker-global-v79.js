@@ -11,6 +11,13 @@ export default {
  async fetch(req,env,ctx){
   const u=new URL(req.url),p=u.pathname.replace(/\/$/,'')||'/',m=req.method.toUpperCase();
 
+  if(p==='/webhooks/whatsapp'&&m==='POST'&&env.DB){
+   const copy=req.clone();
+   if(ctx&&ctx.waitUntil)ctx.waitUntil(trackOtpWhatsappWebhook(copy,env.DB));
+   else await trackOtpWhatsappWebhook(copy,env.DB);
+   return app.fetch(req,env,ctx);
+  }
+
   if(p==='/staff-login'){
    if(m==='GET'){
     try{await app.fetch(new Request(req.url,{method:'GET',headers:req.headers}),env,ctx)}catch(_){}
@@ -18,6 +25,8 @@ export default {
    }
    if(m==='POST'&&env.DB)return doLogin(req,env.DB);
   }
+
+  if(p==='/staff-recover/delivery-status'&&m==='GET'&&env.DB)return otpDeliveryStatus(req,env.DB);
 
   if(p==='/staff-recover'&&m==='GET'){
    try{await app.fetch(new Request(req.url,{method:'GET',headers:req.headers}),env,ctx)}catch(_){}
@@ -104,23 +113,24 @@ async function requestOtp(req,env){
  const code=otpCode();
  const salt=randomHex(16),codeHash=await otpHash(code,salt);
  const expires=new Date(Date.now()+10*60*1000).toISOString();
- const inserted=await env.DB.prepare("INSERT INTO club_staff_otp(user_id,channel,contact_hash,code_hash,code_salt,expires_at) VALUES(?,?,?,?,?,?)")
-  .bind(user?user.id:null,channel,contactHash,codeHash,salt,expires).run();
+ const statusToken=randomHex(24),statusTokenHash=await sha256(statusToken);
+ const inserted=await env.DB.prepare("INSERT INTO club_staff_otp(user_id,channel,contact_hash,code_hash,code_salt,expires_at,status_token_hash) VALUES(?,?,?,?,?,?,?)")
+  .bind(user?user.id:null,channel,contactHash,codeHash,salt,expires,statusTokenHash).run();
  const id=Number(inserted.meta?.last_row_id||0);
 
  let delivery={ok:false,id:''};
  if(user){
   delivery=await deliverOtp(env,channel,contact,code);
   if(delivery.ok){
-   try{await env.DB.prepare("UPDATE club_staff_otp SET provider_message_id=? WHERE id=?").bind(String(delivery.id||''),id).run()}catch(_){}
+   try{await env.DB.prepare("UPDATE club_staff_otp SET provider_message_id=?,provider_status='sent',status_updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(String(delivery.id||''),id).run()}catch(_){}
    await audit(env.DB,'public','otp_sent','staff_user',user.id,channel);
   }else{
-   try{await env.DB.prepare("UPDATE club_staff_otp SET consumed_at=CURRENT_TIMESTAMP WHERE id=?").bind(id).run()}catch(_){}
+   try{await env.DB.prepare("UPDATE club_staff_otp SET consumed_at=CURRENT_TIMESTAMP,provider_status='failed',provider_error=?,status_updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(String(delivery.error||'provider rejected request').slice(0,500),id).run()}catch(_){}
    await audit(env.DB,'public','otp_send_failed','staff_user',user.id,channel);
-   return recoverVerify(id,'إذا كانت البيانات مطابقة وتمكن مزود الإرسال من قبول الطلب فسيصل الرمز. إذا لم يصل، اطلب رمزاً جديداً أو جرّب قناة أخرى.');
+   return recoverVerify(id,'تعذر على مزود الإرسال قبول الرسالة. اطلب رمزاً جديداً أو جرّب قناة أخرى.',statusToken);
   }
  }
- return recoverVerify(id,'إذا كانت البيانات مطابقة لحساب مسجل فقد أُرسل رمز مكوّن من 6 أرقام. الرمز صالح لمدة 10 دقائق.');
+ return recoverVerify(id,channel==='whatsapp'?'Meta قبلت رسالة واتساب. نتحقق الآن من وصولها فعلياً للهاتف. الرمز صالح لمدة 10 دقائق.':'تم إرسال رمز مكوّن من 6 أرقام. الرمز صالح لمدة 10 دقائق.',statusToken);
 }
 
 async function findRecoveryUser(db,identifier,contactHash,channel){
@@ -309,6 +319,14 @@ async function ensureRecoverySchema(db){
   "CREATE INDEX IF NOT EXISTS idx_staff_otp_reset ON club_staff_otp(reset_hash,reset_expires_at)"
  ];
  for(const q of sqls)try{await db.prepare(q).run()}catch(_){}
+ for(const q of [
+  "ALTER TABLE club_staff_otp ADD COLUMN provider_status TEXT",
+  "ALTER TABLE club_staff_otp ADD COLUMN provider_error TEXT",
+  "ALTER TABLE club_staff_otp ADD COLUMN delivered_at TEXT",
+  "ALTER TABLE club_staff_otp ADD COLUMN read_at TEXT",
+  "ALTER TABLE club_staff_otp ADD COLUMN status_updated_at TEXT",
+  "ALTER TABLE club_staff_otp ADD COLUMN status_token_hash TEXT"
+ ])try{await db.prepare(q).run()}catch(_){}
  await seedAcceptedRecoveryMappings(db);
 }
 
@@ -364,8 +382,9 @@ async function sendWhatsAppOtp(env,to,code){
    body:JSON.stringify({messaging_product:'whatsapp',to:digits(to),type:'template',template:{name:template,language:{code:String(env.WHATSAPP_OTP_LANGUAGE||'ar')},components:[{type:'body',parameters:params}]}})
   });
   const d=await r.json().catch(function(){return {}});
-  return {ok:!!(r.ok&&d?.messages?.[0]?.id),id:d?.messages?.[0]?.id||''};
- }catch(_){return {ok:false,id:''}}
+  const e=d?.error||{};
+  return {ok:!!(r.ok&&d?.messages?.[0]?.id),id:d?.messages?.[0]?.id||'',error:[e.message,e.error_user_title,e.error_user_msg,e.code&&('code '+e.code)].filter(Boolean).join(' — ')};
+ }catch(e){return {ok:false,id:'',error:String(e?.message||e)}}
 }
 
 async function sendEmailOtp(env,to,code){
@@ -458,14 +477,49 @@ function recoverStart(env,msg){
  return authPage('استعادة الحساب',body,'/staff-recover');
 }
 
-function recoverVerify(id,msg){
+function recoverVerify(id,msg,statusToken){
  const body='<section class="auth-hero"><span>ONE-TIME CODE</span><h1>أدخل رمز التحقق</h1><p>الرمز 6 أرقام وصالح لمدة 10 دقائق فقط.</p></section>'+
   '<div class="auth-msg good">'+esc(msg)+'</div>'+
+  '<div id="delivery-box" class="auth-msg good" style="display:none"></div>'+
   '<section class="auth-card"><form method="post" action="/staff-recover/verify"><input type="hidden" name="request_id" value="'+Number(id||0)+'">'+
   '<label>رمز التحقق<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9٠-٩]{6}" maxlength="6" required></label>'+
-  '<button>تحقق</button></form><div class="auth-links"><a href="/staff-recover">طلب رمز جديد</a></div></section>';
- return authPage('رمز التحقق',body,'/staff-recover');
+  '<button>تحقق</button></form><div class="auth-links"><a href="/staff-recover">طلب رمز جديد</a></div></section>'+
+  '<script>(function(){var box=document.getElementById("delivery-box");var tries=0;async function check(){tries++;try{var r=await fetch("/staff-recover/delivery-status?request_id='+Number(id||0)+'",{credentials:"same-origin",cache:"no-store"});var d=await r.json();if(d&&d.label){box.style.display="block";box.textContent=d.label;if(d.status==="failed"){box.className="auth-msg bad";return}if(d.status==="delivered"||d.status==="read"){box.className="auth-msg good";return}}}catch(e){}if(tries<20)setTimeout(check,2000)}setTimeout(check,1200)})();</script>';
+ const response=authPage('رمز التحقق',body,'/staff-recover');
+ if(!statusToken)return response;
+ const h=new Headers(response.headers);h.append('Set-Cookie','wdn_otp_status='+statusToken+'; Path=/staff-recover; HttpOnly; Secure; SameSite=Strict; Max-Age=900');
+ return new Response(response.body,{status:response.status,headers:h});
 }
+
+async function otpDeliveryStatus(req,db){
+ const id=Number(new URL(req.url).searchParams.get('request_id')||0),token=cookie(req,'wdn_otp_status');
+ if(!id||!token)return json({status:'unknown',label:''},403);
+ const hash=await sha256(token);
+ const row=await one(db,"SELECT provider_status,provider_error,delivered_at,read_at FROM club_staff_otp WHERE id=? AND status_token_hash=? LIMIT 1",[id,hash]);
+ if(!row)return json({status:'unknown',label:''},404);
+ const status=String(row.provider_status||'pending');
+ const label=status==='read'?'تمت قراءة رسالة واتساب.':status==='delivered'?'✅ وصل رمز واتساب إلى الهاتف.':status==='failed'?'❌ تعذر تسليم رسالة واتساب. اطلب رمزاً جديداً أو جرّب قناة أخرى.':status==='sent'?'أُرسلت الرسالة إلى Meta وننتظر تأكيد وصولها للهاتف…':'جارٍ التحقق من التسليم…';
+ return json({status,label});
+}
+
+async function trackOtpWhatsappWebhook(req,db){
+ try{
+  const body=await req.json();
+  const statuses=[];
+  for(const entry of body?.entry||[])for(const ch of entry?.changes||[])for(const s of ch?.value?.statuses||[])statuses.push(s);
+  for(const s of statuses){
+   const id=String(s.id||'');if(!id)continue;
+   const st=String(s.status||''),ts=s.timestamp?new Date(Number(s.timestamp)*1000).toISOString():new Date().toISOString();
+   const err=(s.errors||[]).map(x=>[x.title,x.message,x.code].filter(Boolean).join(' / ')).join(' | ')||null;
+   if(st==='delivered')await db.prepare("UPDATE club_staff_otp SET provider_status='delivered',delivered_at=COALESCE(delivered_at,?),status_updated_at=?,provider_error=NULL WHERE provider_message_id=?").bind(ts,ts,id).run();
+   else if(st==='read')await db.prepare("UPDATE club_staff_otp SET provider_status='read',delivered_at=COALESCE(delivered_at,?),read_at=COALESCE(read_at,?),status_updated_at=?,provider_error=NULL WHERE provider_message_id=?").bind(ts,ts,ts,id).run();
+   else if(st==='failed')await db.prepare("UPDATE club_staff_otp SET provider_status='failed',provider_error=?,status_updated_at=? WHERE provider_message_id=?").bind(String(err||'WhatsApp delivery failed').slice(0,500),ts,id).run();
+   else if(st==='sent')await db.prepare("UPDATE club_staff_otp SET provider_status='sent',status_updated_at=? WHERE provider_message_id=?").bind(ts,id).run();
+  }
+ }catch(_){}
+}
+
+function json(x,status=200){return new Response(JSON.stringify(x),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}})}
 
 function authPage(title,body,current,status){
  const css=[
