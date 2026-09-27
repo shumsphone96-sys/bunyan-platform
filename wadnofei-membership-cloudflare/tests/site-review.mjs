@@ -104,5 +104,7 @@ check(worker.includes("app from './worker-global-v77.js'"),'existing authenticat
 check(worker.includes("path==='/membership/track'"),'pretty membership tracking route handled');
 check(worker.includes("target.pathname='/track-membership'"),'pretty membership tracking delegates to secure tracker');
 check(worker.includes("path==='/constitution'&&base.status===404"),'unpublished constitution gets a safe public status page');
+check(worker.includes("headers.set('x-content-type-options','nosniff')"),'polished form pages enforce nosniff');
+check(worker.includes("headers.set('x-frame-options','DENY')"),'polished form pages deny framing');
 check(worker.includes('return app.scheduled(event,env,ctx)'),'scheduled notifications delegated');
 console.log('Site review passed: '+checks+' assertions across '+PUBLIC_PATHS.length+' public routes.');
