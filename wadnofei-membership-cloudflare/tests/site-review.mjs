@@ -72,6 +72,10 @@ check(!html.includes('href="/forgot-account"'),'duplicate recovery removed');
 check(html.includes('href="/staff-recover"'),'staff recovery retained');
 check(header('/news').includes('href="/news" aria-current="page"'),'active page indicated');
 check(esc('<>&"')==='&lt;&gt;&amp;&quot;','HTML escaping');
+const schema=fs.readFileSync(new URL('../schema.sql',import.meta.url),'utf8');
+for(const table of ['club_news','club_team','club_board','club_achievements','club_projects','club_events','club_sponsors','club_gallery','club_audit_log']){
+ check(new RegExp('CREATE TABLE IF NOT EXISTS\\s+'+table+'\\b','i').test(schema),'canonical schema includes '+table);
+}
 const worker=fs.readFileSync(new URL('../worker-global-v78.js',import.meta.url),'utf8');
 check(worker.includes("app from './worker-global-v77.js'"),'existing authentication chain retained');
 check(worker.includes("path==='/membership/track'"),'pretty membership tracking route handled');
