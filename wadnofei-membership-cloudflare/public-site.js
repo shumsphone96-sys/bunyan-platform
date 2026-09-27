@@ -10,17 +10,38 @@ export const PUBLIC_SCHEMA_SQL=[
  "CREATE TABLE IF NOT EXISTS club_sponsors(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,kind TEXT DEFAULT 'داعم',url TEXT,note TEXT,sort_order INTEGER DEFAULT 0,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
  "CREATE TABLE IF NOT EXISTS club_gallery(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL,image_url TEXT NOT NULL,caption TEXT,sort_order INTEGER DEFAULT 0,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"
 ];
+export const PUBLIC_COMPAT_COLUMNS={
+ club_news:{body:'TEXT',category:"TEXT DEFAULT 'عام'",is_published:'INTEGER NOT NULL DEFAULT 1',created_by:'TEXT',created_at:'TEXT'},
+ club_team:{role:'TEXT',number:'TEXT',note:'TEXT',sort_order:'INTEGER DEFAULT 0',created_at:'TEXT'},
+ club_board:{position:'TEXT',note:'TEXT',sort_order:'INTEGER DEFAULT 0',created_at:'TEXT'},
+ club_achievements:{achievement_date:'TEXT',details:'TEXT',created_at:'TEXT'},
+ club_projects:{summary:'TEXT',status:"TEXT DEFAULT 'قيد التنفيذ'",target:'TEXT',progress:'INTEGER DEFAULT 0',is_published:'INTEGER NOT NULL DEFAULT 1',created_at:'TEXT'},
+ club_events:{event_date:'TEXT',location:'TEXT',details:'TEXT',is_published:'INTEGER NOT NULL DEFAULT 1',created_at:'TEXT'},
+ club_sponsors:{kind:"TEXT DEFAULT 'داعم'",url:'TEXT',note:'TEXT',sort_order:'INTEGER DEFAULT 0',created_at:'TEXT'},
+ club_gallery:{image_url:'TEXT',caption:'TEXT',sort_order:'INTEGER DEFAULT 0',created_at:'TEXT'}
+};
 const schemaReady=new WeakMap();
 export async function ensurePublicSchema(db){
  if(!db)return;
  let pending=schemaReady.get(db);
  if(!pending){
-  pending=(async()=>{for(const sql of PUBLIC_SCHEMA_SQL)await db.prepare(sql).run()})();
+  pending=(async()=>{
+   for(const sql of PUBLIC_SCHEMA_SQL)await db.prepare(sql).run();
+   for(const [table,columns] of Object.entries(PUBLIC_COMPAT_COLUMNS)){
+    const info=await db.prepare('PRAGMA table_info('+table+')').all();
+    const present=new Set((info.results||[]).map(x=>String(x.name||'')));
+    for(const [column,definition] of Object.entries(columns)){
+     if(present.has(column))continue;
+     try{await db.prepare('ALTER TABLE '+table+' ADD COLUMN '+column+' '+definition).run()}
+     catch(err){if(!/duplicate column name/i.test(String(err?.message||err||'')))throw err}
+    }
+   }
+  })();
   schemaReady.set(db,pending);
  }
  try{await pending}catch(err){schemaReady.delete(db);throw err}
 }
-// Public reads bypass legacy schema/bootstrap writes; no member/account data is changed.
+// Public routes perform only idempotent, additive compatibility setup for public CMS tables. Member/account tables are never touched here.
 export const PUBLIC_PATHS=['/','/about','/activities','/contact','/news','/team','/board','/achievements','/projects','/events','/sponsors','/gallery','/history','/identity'];
 export async function publicSite(req,env){
  const path=new URL(req.url).pathname.replace(/\/$/,'')||'/';
