@@ -71,11 +71,28 @@ const collections={
  '/sponsors':['الداعمون','شكراً لكل من يساهم في دعم النادي وأنشطته.','SELECT name,kind,note,url FROM club_sponsors ORDER BY sort_order,id',x=>'<article class="wdn-card"><span class="wdn-label">'+esc(x.kind||'داعم')+'</span><h3>'+esc(x.name)+'</h3><p>'+esc(x.note||'')+'</p>'+(safeUrl(x.url)?'<a href="'+esc(safeUrl(x.url))+'" target="_blank" rel="noopener noreferrer">زيارة الموقع ←</a>':'')+'</article>','لم تُنشر قائمة الداعمين بعد.'],
  '/gallery':['معرض الصور','صور موثقة من حياة النادي وأنشطته.','SELECT title,image_url,caption FROM club_gallery ORDER BY sort_order,id DESC',x=>'<article class="wdn-card">'+(safeUrl(x.image_url)?'<img src="'+esc(safeUrl(x.image_url))+'" alt="'+esc(x.title)+'" loading="lazy" decoding="async" referrerpolicy="no-referrer">':'')+'<h3>'+esc(x.title)+'</h3><p>'+esc(x.caption||'')+'</p></article>','لا توجد صور منشورة حالياً.']
 };
+const collectionTables={
+ '/news':'club_news','/team':'club_team','/board':'club_board','/achievements':'club_achievements',
+ '/projects':'club_projects','/events':'club_events','/sponsors':'club_sponsors','/gallery':'club_gallery'
+};
+async function publicColumnProfile(db,table){
+ const allowedTables=new Set(Object.values(collectionTables));
+ const allowedColumns=new Set(['id','title','body','category','is_published','created_by','created_at','name','role','number','note','sort_order','position','details','achievement_date','summary','status','target','progress','event_date','location','kind','url','image_url','caption']);
+ if(!db||!allowedTables.has(table))return '';
+ try{
+  const result=await db.prepare('PRAGMA table_info('+table+')').all();
+  return (result.results||[]).map(x=>String(x.name||'')).filter(x=>allowedColumns.has(x)).join(',');
+ }catch{return ''}
+}
 async function collection(path,db){
  const [title,description,sql,render,message]=collections[path],data=await read(db,sql);
  const body=heading(title,description)+'<div class="wdn-wrap">'+(data.failed?'<div class="wdn-empty" role="alert"><h2>تعذر تحميل المحتوى</h2><p>أعد المحاولة بعد قليل.</p></div>':data.rows.length?'<div class="wdn-grid">'+data.rows.map(render).join('')+'</div>':empty(message))+'</div>';
  const response=page(title,description,body,path,data.failed?503:200);
- if(data.failed)response.headers.set('x-wadnofei-data-state',data.reason||'db-error');
+ if(data.failed){
+  response.headers.set('x-wadnofei-data-state',data.reason||'db-error');
+  const profile=await publicColumnProfile(db,collectionTables[path]);
+  if(profile)response.headers.set('x-wadnofei-schema-columns',profile);
+ }
  return response;
 }
 const staticPages={
