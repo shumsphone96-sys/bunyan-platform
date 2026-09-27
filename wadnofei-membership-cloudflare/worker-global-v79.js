@@ -98,7 +98,7 @@ async function requestOtp(req,env){
  const recent=await scalar(env.DB,"SELECT COUNT(*) c FROM club_staff_otp WHERE contact_hash=? AND requested_at>datetime('now','-15 minutes')",[contactHash]);
  if(recent>=3)return recoverStart(env,'تم طلب رموز كثيرة خلال وقت قصير. انتظر 15 دقيقة ثم حاول مرة أخرى.');
 
- const user=await findRecoveryUser(env.DB,identifier,contactHash);
+ const user=await findRecoveryUser(env.DB,identifier,contactHash,channel);
  const code=otpCode();
  const salt=randomHex(16),codeHash=await otpHash(code,salt);
  const expires=new Date(Date.now()+10*60*1000).toISOString();
@@ -121,10 +121,15 @@ async function requestOtp(req,env){
  return recoverVerify(id,'إذا كانت البيانات مطابقة لحساب مسجل فقد أُرسل رمز مكوّن من 6 أرقام. الرمز صالح لمدة 10 دقائق.');
 }
 
-async function findRecoveryUser(db,identifier,contactHash){
+async function findRecoveryUser(db,identifier,contactHash,channel){
  let user=null;
+ const kinds=channel==='email'?['email']:channel==='whatsapp'?['whatsapp','phone']:channel==='sms'?['sms','phone']:[];
  try{
-  user=await db.prepare("SELECT u.* FROM club_staff_recovery_methods r JOIN club_staff_users u ON u.id=r.user_id WHERE r.contact_hash=? AND r.is_active=1 AND u.is_active=1 LIMIT 1").bind(contactHash).first();
+  if(kinds.length===1){
+   user=await db.prepare("SELECT u.* FROM club_staff_recovery_methods r JOIN club_staff_users u ON u.id=r.user_id WHERE r.contact_hash=? AND r.kind=? AND r.is_active=1 AND u.is_active=1 LIMIT 1").bind(contactHash,kinds[0]).first();
+  }else if(kinds.length===2){
+   user=await db.prepare("SELECT u.* FROM club_staff_recovery_methods r JOIN club_staff_users u ON u.id=r.user_id WHERE r.contact_hash=? AND r.kind IN (?,?) AND r.is_active=1 AND u.is_active=1 LIMIT 1").bind(contactHash,kinds[0],kinds[1]).first();
+  }
  }catch(_){}
  if(!user){
   try{user=await db.prepare("SELECT * FROM club_staff_users WHERE recovery_contact_hash=? AND is_active=1 LIMIT 1").bind(contactHash).first()}catch(_){}
@@ -222,7 +227,8 @@ async function accountSetupPage(db,ok,error){
    '<form method="post">'+
    '<input type="hidden" name="user_id" value="'+Number(u.id)+'">'+
    '<label>اسم الدخول<input name="username" value="'+esc(u.username||'')+'" autocomplete="off"></label>'+
-   '<label>هاتف الاستعادة <small>الحالي: '+esc(m.phone||((u.recovery_contact_hint||'').startsWith('••••')?u.recovery_contact_hint:'غير مربوط'))+'</small><input name="phone" inputmode="tel" autocomplete="tel" placeholder="مثال: 0912... أو 249912..."></label>'+
+   '<label>رقم واتساب للاستعادة <small>الحالي: '+esc(m.whatsapp||m.phone||'غير مربوط')+'</small><input name="whatsapp" inputmode="tel" autocomplete="tel" placeholder="مثال: 0912... أو 249912..."></label>'+
+   '<label>رقم SMS للاستعادة <small>الحالي: '+esc(m.sms||m.phone||'غير مربوط')+'</small><input name="sms" inputmode="tel" autocomplete="tel" placeholder="مثال: 0122... أو 249122..."></label>'+
    '<label>بريد الاستعادة <small>الحالي: '+esc(m.email||((u.recovery_contact_hint||'').includes('@')?u.recovery_contact_hint:'غير مربوط'))+'</small><input name="email" type="email" autocomplete="email" placeholder="name@example.com"></label>'+
    '<label>كلمة مرور أولية <small>اختياري — يمكن لصاحب الحساب تفعيل نفسه بالرمز.</small><input name="password" type="password" minlength="10" autocomplete="new-password"></label>'+
    '<button>حفظ إعداد هذا الحساب</button></form></section>';
@@ -237,7 +243,7 @@ async function accountSetupPage(db,ok,error){
 async function saveAccountSetup(req,db,actor,path){
  if(!sameOrigin(req))return red(path+'?error=origin');
  await ensureRecoverySchema(db);
- const f=await req.formData(),id=Number(f.get('user_id')||0),username=String(f.get('username')||'').trim(),phoneRaw=String(f.get('phone')||'').trim(),emailRaw=String(f.get('email')||'').trim(),password=String(f.get('password')||'');
+ const f=await req.formData(),id=Number(f.get('user_id')||0),username=String(f.get('username')||'').trim(),whatsappRaw=String(f.get('whatsapp')||'').trim(),smsRaw=String(f.get('sms')||'').trim(),emailRaw=String(f.get('email')||'').trim(),password=String(f.get('password')||'');
  const target=await one(db,"SELECT * FROM club_staff_users WHERE id=? AND is_active=1",[id]);
  if(!target)return red(path+'?error=user');
  if(username){
@@ -246,14 +252,23 @@ async function saveAccountSetup(req,db,actor,path){
   if(d)return red(path+'?error=duplicate');
   await db.prepare("UPDATE club_staff_users SET username=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(username,id).run();
  }
- if(phoneRaw){
-  const phone=normalizePhone(phoneRaw);
+ if(whatsappRaw){
+  const phone=normalizePhone(whatsappRaw);
   if(phone.length<10)return red(path+'?error=phone');
   const hash=await sha256(phone),hint='•••• '+phone.slice(-4);
   const d=await one(db,"SELECT user_id FROM club_staff_recovery_methods WHERE contact_hash=? AND user_id<>? AND is_active=1",[hash,id]);
   if(d)return red(path+'?error=contact');
-  await upsertRecoveryMethod(db,id,'phone',hash,hint);
+  await upsertRecoveryMethod(db,id,'whatsapp',hash,hint);
   await db.prepare("UPDATE club_staff_users SET recovery_contact_hash=?,recovery_contact_hint=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(hash,hint,id).run();
+ }
+ if(smsRaw){
+  const phone=normalizePhone(smsRaw);
+  if(phone.length<10)return red(path+'?error=phone');
+  const hash=await sha256(phone),hint='•••• '+phone.slice(-4);
+  const d=await one(db,"SELECT user_id FROM club_staff_recovery_methods WHERE contact_hash=? AND user_id<>? AND is_active=1",[hash,id]);
+  if(d)return red(path+'?error=contact');
+  await upsertRecoveryMethod(db,id,'sms',hash,hint);
+  if(!whatsappRaw)await db.prepare("UPDATE club_staff_users SET recovery_contact_hash=?,recovery_contact_hint=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(hash,hint,id).run();
  }
  if(emailRaw){
   const email=normalizeEmail(emailRaw);
@@ -262,7 +277,7 @@ async function saveAccountSetup(req,db,actor,path){
   const d=await one(db,"SELECT user_id FROM club_staff_recovery_methods WHERE contact_hash=? AND user_id<>? AND is_active=1",[hash,id]);
   if(d)return red(path+'?error=contact');
   await upsertRecoveryMethod(db,id,'email',hash,hint);
-  if(!phoneRaw)await db.prepare("UPDATE club_staff_users SET recovery_contact_hash=?,recovery_contact_hint=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(hash,hint,id).run();
+  if(!whatsappRaw&&!smsRaw)await db.prepare("UPDATE club_staff_users SET recovery_contact_hash=?,recovery_contact_hint=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(hash,hint,id).run();
  }
  if(password){
   if(password.length<10)return red(path+'?error=short');
@@ -292,13 +307,32 @@ async function ensureRecoverySchema(db){
   "CREATE INDEX IF NOT EXISTS idx_staff_otp_reset ON club_staff_otp(reset_hash,reset_expires_at)"
  ];
  for(const q of sqls)try{await db.prepare(q).run()}catch(_){}
+ await seedAcceptedRecoveryMappings(db);
+}
+
+async function seedAcceptedRecoveryMappings(db){
+ const mappings=[
+  ['secretary','email','94e557479957a1f58c117131011cc829f5fd881373ada7aaf25d3de855861717','sh***@hotmail.com'],
+  ['finance_manager','whatsapp','773e918027070e56c868f73ef5891918c9b016fc3b52d1252074931789dfce8f','•••• 3242'],
+  ['president','sms','a677ffc183e29d0276200187a09c0c41fbbb2fe416ae2091ecc18e39bd5c88dc','•••• 9004']
+ ];
+ for(const [role,kind,hash,hint] of mappings){
+  try{
+   let u=await db.prepare("SELECT id FROM club_staff_users WHERE role=? AND is_active=1 LIMIT 1").bind(role).first();
+   if(!u&&role==='finance_manager')u=await db.prepare("SELECT id FROM club_staff_users WHERE role='finance' AND is_active=1 LIMIT 1").first();
+   if(!u)continue;
+   const conflict=await db.prepare("SELECT user_id FROM club_staff_recovery_methods WHERE contact_hash=? AND is_active=1 LIMIT 1").bind(hash).first();
+   if(conflict&&Number(conflict.user_id)!==Number(u.id))continue;
+   await upsertRecoveryMethod(db,u.id,kind,hash,hint);
+  }catch(_){}
+ }
 }
 
 function capabilities(env){
  return {
   whatsapp:!!(env.WHATSAPP_TOKEN&&env.WHATSAPP_PHONE_NUMBER_ID),
-  email:!!(env.BREVO_API_KEY&&(env.BREVO_SENDER_EMAIL||env.BREVO_FROM_EMAIL)),
-  sms:!!(env.BREVO_API_KEY&&env.BREVO_SMS_SENDER)
+  email:!!((env.RESEND_API_KEY&&env.RESEND_FROM_EMAIL)||(env.BREVO_API_KEY&&(env.BREVO_SENDER_EMAIL||env.BREVO_FROM_EMAIL))),
+  sms:!!((env.TWILIO_ACCOUNT_SID&&env.TWILIO_AUTH_TOKEN&&env.TWILIO_FROM_NUMBER)||(env.BREVO_API_KEY&&env.BREVO_SMS_SENDER))
  };
 }
 
@@ -327,8 +361,23 @@ async function sendWhatsAppOtp(env,to,code){
 
 async function sendEmailOtp(env,to,code){
  try{
+  if(env.RESEND_API_KEY&&env.RESEND_FROM_EMAIL){
+   const r=await fetch('https://api.resend.com/emails',{
+    method:'POST',
+    headers:{authorization:'Bearer '+env.RESEND_API_KEY,'content-type':'application/json'},
+    body:JSON.stringify({
+     from:String(env.RESEND_FROM_EMAIL),
+     to:[to],
+     subject:'رمز تفعيل أو استعادة حساب نادي ود نفيع',
+     text:'رمز التحقق: '+code+' — صالح لمدة 10 دقائق. لا تشارك الرمز مع أي شخص.',
+     html:'<div dir="rtl"><h2>نادي ود نفيع</h2><p>رمز التحقق:</p><p style="font-size:32px;font-weight:800;letter-spacing:6px">'+code+'</p><p>صالح لمدة 10 دقائق. لا تشارك الرمز مع أي شخص.</p></div>'
+    })
+   });
+   const d=await r.json().catch(function(){return {}});
+   return {ok:r.ok,id:String(d.id||'')};
+  }
   const sender=String(env.BREVO_SENDER_EMAIL||env.BREVO_FROM_EMAIL||'');
-  if(!sender)return {ok:false,id:''};
+  if(!sender||!env.BREVO_API_KEY)return {ok:false,id:''};
   const r=await fetch('https://api.brevo.com/v3/smtp/email',{
    method:'POST',
    headers:{'api-key':env.BREVO_API_KEY,'content-type':'application/json','accept':'application/json'},
@@ -347,6 +396,16 @@ async function sendEmailOtp(env,to,code){
 
 async function sendSmsOtp(env,to,code){
  try{
+  if(env.TWILIO_ACCOUNT_SID&&env.TWILIO_AUTH_TOKEN&&env.TWILIO_FROM_NUMBER){
+   const body=new URLSearchParams({To:'+'+digits(to),From:String(env.TWILIO_FROM_NUMBER),Body:'رمز نادي ود نفيع: '+code+'. صالح 10 دقائق. لا تشاركه.'});
+   const basic=btoa(String(env.TWILIO_ACCOUNT_SID)+':'+String(env.TWILIO_AUTH_TOKEN));
+   const r=await fetch('https://api.twilio.com/2010-04-01/Accounts/'+env.TWILIO_ACCOUNT_SID+'/Messages.json',{
+    method:'POST',headers:{authorization:'Basic '+basic,'content-type':'application/x-www-form-urlencoded'},body
+   });
+   const d=await r.json().catch(function(){return {}});
+   return {ok:r.ok,id:String(d.sid||'')};
+  }
+  if(!env.BREVO_API_KEY||!env.BREVO_SMS_SENDER)return {ok:false,id:''};
   const r=await fetch('https://api.brevo.com/v3/transactionalSMS/send',{
    method:'POST',
    headers:{'api-key':env.BREVO_API_KEY,'content-type':'application/json','accept':'application/json'},
