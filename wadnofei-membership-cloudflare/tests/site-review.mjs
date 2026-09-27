@@ -16,7 +16,8 @@ function db(rows=[],fail=false){
    return {async all(){return {results:[]}}};
   }
   check(/^SELECT\s/i.test(sql),'public data query must be SELECT');
-  if(/\b(club_news|club_projects|club_events)\b/.test(sql))check(/is_published=1/.test(sql),'publication filter required');
+  if(/\b(club_news|club_projects|club_events)\b/.test(sql)&&!/\bstatus\b/i.test(sql))check(/is_published=1/.test(sql),'publication filter required');
+  if(/\bclub_news\b/.test(sql)&&/\bstatus\b/i.test(sql))check(/published|منشور/.test(sql),'legacy news fallback still filters publication status');
   return {async all(){if(fail)throw Error('unavailable');return {results:rows}}};
  }};
 }
@@ -45,6 +46,15 @@ check((response.headers.get('permissions-policy')||'').includes('camera=()'),'pu
 check(await publicSite(new Request('https://members.shamsphone.net/membership'),{DB:db()})===null,'membership delegated');
 check(await publicSite(new Request('https://members.shamsphone.net/',{method:'POST'}),{DB:db()})===null,'mutations delegated');
 check(await publicSite(new Request('https://members.shamsphone.net/club-admin'),{DB:db()})===null,'admin delegated');
+const legacyNewsDB={prepare(sql){
+ if(/^CREATE TABLE IF NOT EXISTS\s/i.test(sql))return {async run(){return {success:true}}};
+ if(/is_published=1/.test(sql))return {async all(){throw Error('D1_ERROR: no such column: category')}};
+ if(/FROM club_news/.test(sql)&&/\bstatus\b/i.test(sql))return {async all(){return {results:[{title:'خبر قديم منشور',body:'نص قديم',category:'عام',created_at:'2026-09-01'}]}}};
+ return {async all(){return {results:[]}}};
+}};
+response=await publicSite(new Request('https://members.shamsphone.net/news'),{DB:legacyNewsDB});
+check(response.status===200,'legacy V9 news schema remains readable without migration');
+check((await response.text()).includes('خبر قديم منشور'),'legacy published news is rendered');
 response=await publicSite(new Request('https://members.shamsphone.net/news'),{DB:db([],true)});
 check(response.status===503,'unavailable data is not shown as empty success');
 check((await response.text()).includes('تعذر تحميل المحتوى'),'explicit data error');
