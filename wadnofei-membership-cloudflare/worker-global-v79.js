@@ -87,12 +87,14 @@ async function requestOtp(req,env){
  if(!sameOrigin(req))return recoverStart(env,'تعذر قبول الطلب. أعد فتح الصفحة وحاول مرة أخرى.');
  await ensureRecoverySchema(env.DB);
  const f=await req.formData();
- const identifier=String(f.get('identifier')||'').trim();
- const contact=normalizeContact(String(f.get('contact')||''));
+ let identifier=String(f.get('identifier')||'').trim();
+ let contactRaw=String(f.get('contact')||'').trim();
  const channel=String(f.get('channel')||'');
+ if(!contactRaw&&(identifier.includes('@')||digits(identifier).length>=8)){contactRaw=identifier;identifier='';}
+ const contact=normalizeContact(contactRaw);
  const caps=capabilities(env);
  if(!['whatsapp','email','sms'].includes(channel)||!caps[channel])return recoverStart(env,'قناة الإرسال المختارة غير مهيأة حالياً.');
- if(!validContactForChannel(contact,channel))return recoverStart(env,'أدخل وسيلة استعادة صحيحة تناسب القناة المختارة.');
+ if(!validContactForChannel(contact,channel))return recoverStart(env,channel==='email'?'أدخل البريد الإلكتروني المسجل لهذا الحساب.':channel==='whatsapp'?'أدخل رقم واتساب المسجل لهذا الحساب.':'أدخل رقم الهاتف المسجل لاستلام SMS.');
 
  const contactHash=await sha256(contact);
  const recent=await scalar(env.DB,"SELECT COUNT(*) c FROM club_staff_otp WHERE contact_hash=? AND requested_at>datetime('now','-15 minutes')",[contactHash]);
@@ -436,8 +438,7 @@ function recoverStart(env,msg){
  const body='<section class="auth-hero"><span>SECURE RECOVERY</span><h1>تفعيل أو استعادة الحساب</h1><p>أدخل وسيلة الاستعادة المسجلة واختر أين تريد استلام رمز التحقق.</p></section>'+
   (msg?'<div class="auth-msg bad">'+esc(msg)+'</div>':'')+
   '<section class="auth-card"><form method="post" action="/staff-recover/request">'+
-  '<label>اسم الدخول <small>اختياري إذا كنت لا تتذكره.</small><input name="identifier" autocomplete="username"></label>'+
-  '<label>الهاتف أو البريد المسجل<input name="contact" autocomplete="email tel" required></label>'+
+  '<label>وسيلة الاستعادة المسجلة <small>اكتب رقم واتساب عند اختيار واتساب، أو البريد عند اختيار البريد، أو رقم الهاتف عند اختيار SMS.</small><input name="contact" autocomplete="email tel" required placeholder="رقم الهاتف أو البريد المسجل"></label>'+
   '<div class="channels">'+
   option('whatsapp','واتساب','رمز مؤقت إلى رقم واتساب المسجل.',caps.whatsapp)+
   option('email','البريد الإلكتروني','رمز مؤقت إلى البريد المسجل.',caps.email)+
