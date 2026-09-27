@@ -46,13 +46,14 @@ jobs:
           node --check wadnofei-membership-cloudflare/worker-global-v72.js
           node --check wadnofei-membership-cloudflare/worker-global-v73.js
           node --check wadnofei-membership-cloudflare/src/index.js
-          for file in wadnofei-membership-cloudflare/worker-global-v7{4,5,6,7,8}.js wadnofei-membership-cloudflare/site-*.js wadnofei-membership-cloudflare/public-site.js; do node --check "$file"; done
+          for file in wadnofei-membership-cloudflare/worker-global-v7{4,5,6,7,8,9}.js wadnofei-membership-cloudflare/site-*.js wadnofei-membership-cloudflare/public-site.js; do node --check "$file"; done
 
       - name: Run role, security, and privacy smoke tests
         run: |
           set -e
           node wadnofei-membership-cloudflare/tests/role-security-smoke.mjs
           node wadnofei-membership-cloudflare/tests/site-review.mjs
+          node wadnofei-membership-cloudflare/tests/auth-recovery-v79.mjs
 
       - name: Smoke test Cloudflare branch preview
         env:
@@ -88,6 +89,13 @@ jobs:
                 fi
               ;;
             esac
+            if [ "$path" = "/staff-login" ] || [ "$path" = "/staff-recover" ]; then
+              if ! grep -qi '^x-wadnofei-auth: v79-otp-recovery' /tmp/wdn-head; then
+                echo "V79 auth marker missing for $path"
+                cat /tmp/wdn-head
+                exit 1
+              fi
+            fi
           done
           curl --retry 3 --retry-delay 1 -sS -D /tmp/wdn-root-head -o /tmp/wdn-root-body "${PREVIEW_BASE}/"
           grep -qi '^x-frame-options: DENY' /tmp/wdn-root-head
@@ -105,12 +113,12 @@ jobs:
 
       - name: Verify active worker version
         run: |
-          grep -F "worker-global-v78.js" wadnofei-membership-cloudflare/src/index.js
+          grep -F "worker-global-v79.js" wadnofei-membership-cloudflare/src/index.js
 
       - name: Block destructive membership SQL in new layers
         run: |
           set -e
-          if grep -Eni "DROP[[:space:]]+TABLE|DELETE[[:space:]]+FROM[[:space:]]+(members|applications)|TRUNCATE"             wadnofei-membership-cloudflare/worker-global-v7{1,2,3,4,5,6,7,8}.js wadnofei-membership-cloudflare/public-site.js; then
+          if grep -Eni "DROP[[:space:]]+TABLE|DELETE[[:space:]]+FROM[[:space:]]+(members|applications)|TRUNCATE"             wadnofei-membership-cloudflare/worker-global-v7{1,2,3,4,5,6,7,8,9}.js wadnofei-membership-cloudflare/public-site.js; then
             echo "Destructive membership SQL detected"
             exit 1
           fi
