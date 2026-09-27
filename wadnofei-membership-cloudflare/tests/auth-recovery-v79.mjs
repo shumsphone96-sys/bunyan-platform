@@ -31,6 +31,11 @@ check(code.includes('اسم الدخول أو الهاتف أو البريد'),'
 check(code.includes("channel==='whatsapp'"),'WhatsApp OTP channel exists');
 check(code.includes("channel==='email'"),'email OTP channel exists');
 check(code.includes("channel==='sms'"),'SMS OTP channel exists');
+check(code.includes("SELECT id FROM club_staff_users WHERE role='secretary'"),'secretary is the single recovery-account owner');
+check(code.includes("['email','94e557479957a1f58c117131011cc829f5fd881373ada7aaf25d3de855861717'"),'secretary email recovery mapping is present');
+check(code.includes("['whatsapp','773e918027070e56c868f73ef5891918c9b016fc3b52d1252074931789dfce8f'"),'secretary WhatsApp recovery mapping is present');
+check(code.includes("['sms','a677ffc183e29d0276200187a09c0c41fbbb2fe416ae2091ecc18e39bd5c88dc'"),'secretary SMS recovery mapping is present');
+check(code.includes('DELETE FROM club_staff_recovery_methods WHERE contact_hash=? AND user_id<>?'),'wrong prior recovery ownership is corrected');
 check(code.includes('WHATSAPP_TOKEN')&&code.includes('WHATSAPP_PHONE_NUMBER_ID'),'WhatsApp reuses configured Cloud API credentials');
 check(code.includes('https://api.brevo.com/v3/smtp/email'),'Brevo transactional email endpoint used');
 check(code.includes('https://api.brevo.com/v3/transactionalSMS/send'),'current Brevo transactional SMS endpoint used');
