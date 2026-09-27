@@ -25,14 +25,14 @@ for(const path of PUBLIC_PATHS){
  check(html.includes('href="https://members.shamsphone.net'+path+'"'),path+' canonical');
  for(const match of html.matchAll(/href="(\/[^"]*)"/g))check(knownLinks.has(match[1]),path+' known navigation target '+match[1]);
 }
-response=await publicSite(new Request('https://members.shamsphone.net/'),{DB:db()});
+let response=await publicSite(new Request('https://members.shamsphone.net/'),{DB:db()});
 check(response.headers.get('x-frame-options')==='DENY','public pages deny framing');
 check((response.headers.get('content-security-policy')||'').includes("frame-ancestors 'none'"),'public CSP blocks framing');
 check((response.headers.get('permissions-policy')||'').includes('camera=()'),'public permissions policy disables camera');
 check(await publicSite(new Request('https://members.shamsphone.net/membership'),{DB:db()})===null,'membership delegated');
 check(await publicSite(new Request('https://members.shamsphone.net/',{method:'POST'}),{DB:db()})===null,'mutations delegated');
 check(await publicSite(new Request('https://members.shamsphone.net/club-admin'),{DB:db()})===null,'admin delegated');
-let response=await publicSite(new Request('https://members.shamsphone.net/news'),{DB:db([],true)});
+response=await publicSite(new Request('https://members.shamsphone.net/news'),{DB:db([],true)});
 check(response.status===503,'unavailable data is not shown as empty success');
 check((await response.text()).includes('تعذر تحميل المحتوى'),'explicit data error');
 response=await publicSite(new Request('https://members.shamsphone.net/'),{DB:db([],true)});
