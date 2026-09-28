@@ -53,7 +53,8 @@ jobs:
           set -e
           node wadnofei-membership-cloudflare/tests/role-security-smoke.mjs
           node wadnofei-membership-cloudflare/tests/site-review.mjs
-          node wadnofei-membership-cloudflare/tests/auth-recovery-v79.mjs\n          node wadnofei-membership-cloudflare/tests/legacy-auth-v80.mjs
+          node wadnofei-membership-cloudflare/tests/auth-recovery-v79.mjs
+          node wadnofei-membership-cloudflare/tests/legacy-auth-v80.mjs
 
       - name: Smoke test Cloudflare branch preview
         env:
@@ -102,6 +103,21 @@ jobs:
           grep -qi '^content-security-policy: .*frame-ancestors' /tmp/wdn-root-head
           admin_code="$(curl --retry 3 --retry-delay 1 -sS -o /dev/null -w '%{http_code}' "${PREVIEW_BASE}/club-admin/access/passwords")"
           case "$admin_code" in 302|303) ;; *) echo "Protected admin route returned HTTP $admin_code"; exit 1;; esac
+
+          check_redirect() {
+            path="$1"
+            expected="$2"
+            curl --retry 3 --retry-delay 1 -sS -D /tmp/wdn-legacy-head -o /dev/null "${PREVIEW_BASE}${path}"
+            code="$(awk 'NR==1 {print $2}' /tmp/wdn-legacy-head)"
+            location="$(awk 'BEGIN{IGNORECASE=1} /^location:/ {sub(/\r$/,"",$2); print $2; exit}' /tmp/wdn-legacy-head)"
+            test "$code" = "303" || { echo "Legacy route $path returned HTTP $code"; cat /tmp/wdn-legacy-head; exit 1; }
+            test "$location" = "$expected" || { echo "Legacy route $path redirected to $location instead of $expected"; cat /tmp/wdn-legacy-head; exit 1; }
+            grep -qi '^x-wadnofei-auth: v80-legacy-auth-closed' /tmp/wdn-legacy-head
+          }
+          check_redirect "/login" "/staff-login?next=%2Fclub-admin"
+          check_redirect "/forgot-account" "/staff-recover"
+          check_redirect "/change-password" "/staff-security"
+          check_redirect "/logout" "/staff-logout"
 
       - name: Install browser QA dependency
         run: npm install --no-save --ignore-scripts --no-audit --no-fund puppeteer-core@24.16.0
