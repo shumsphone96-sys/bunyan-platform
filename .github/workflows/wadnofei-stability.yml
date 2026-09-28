@@ -46,7 +46,7 @@ jobs:
           node --check wadnofei-membership-cloudflare/worker-global-v72.js
           node --check wadnofei-membership-cloudflare/worker-global-v73.js
           node --check wadnofei-membership-cloudflare/src/index.js
-          for file in wadnofei-membership-cloudflare/worker-global-v7{4,5,6,7,8,9}.js wadnofei-membership-cloudflare/worker-global-v80.js wadnofei-membership-cloudflare/site-*.js wadnofei-membership-cloudflare/public-site.js; do node --check "$file"; done
+          for file in wadnofei-membership-cloudflare/worker-global-v7{4,5,6,7,8,9}.js wadnofei-membership-cloudflare/worker-global-v80.js wadnofei-membership-cloudflare/worker-global-v81.js wadnofei-membership-cloudflare/site-*.js wadnofei-membership-cloudflare/public-site.js; do node --check "$file"; done
 
       - name: Run role, security, and privacy smoke tests
         run: |
@@ -55,6 +55,7 @@ jobs:
           node wadnofei-membership-cloudflare/tests/site-review.mjs
           node wadnofei-membership-cloudflare/tests/auth-recovery-v79.mjs
           node wadnofei-membership-cloudflare/tests/legacy-auth-v80.mjs
+          node wadnofei-membership-cloudflare/tests/auth-cookie-v81.mjs
 
       - name: Smoke test Cloudflare branch preview
         env:
@@ -119,6 +120,11 @@ jobs:
           check_redirect "/change-password" "/staff-security"
           check_redirect "/logout" "/staff-logout"
 
+          curl --retry 3 --retry-delay 1 -sS -D /tmp/wdn-bad-cookie-head -o /tmp/wdn-bad-cookie-body -H 'Cookie: club_sid=%' "${PREVIEW_BASE}/staff-login"
+          grep -qi '^HTTP/.* 200' /tmp/wdn-bad-cookie-head
+          grep -qi '^x-wadnofei-auth-sanitize: v81' /tmp/wdn-bad-cookie-head
+          grep -qi '^set-cookie: club_sid=;' /tmp/wdn-bad-cookie-head
+
       - name: Install browser QA dependency
         run: npm install --no-save --ignore-scripts --no-audit --no-fund puppeteer-core@24.16.0
 
@@ -129,12 +135,12 @@ jobs:
 
       - name: Verify active worker version
         run: |
-          grep -F "worker-global-v80.js" wadnofei-membership-cloudflare/src/index.js
+          grep -F "worker-global-v81.js" wadnofei-membership-cloudflare/src/index.js
 
       - name: Block destructive membership SQL in new layers
         run: |
           set -e
-          if grep -Eni "DROP[[:space:]]+TABLE|DELETE[[:space:]]+FROM[[:space:]]+(members|applications)|TRUNCATE"             wadnofei-membership-cloudflare/worker-global-v7{1,2,3,4,5,6,7,8,9}.js wadnofei-membership-cloudflare/worker-global-v80.js wadnofei-membership-cloudflare/public-site.js; then
+          if grep -Eni "DROP[[:space:]]+TABLE|DELETE[[:space:]]+FROM[[:space:]]+(members|applications)|TRUNCATE"             wadnofei-membership-cloudflare/worker-global-v7{1,2,3,4,5,6,7,8,9}.js wadnofei-membership-cloudflare/worker-global-v80.js wadnofei-membership-cloudflare/worker-global-v81.js wadnofei-membership-cloudflare/public-site.js; then
             echo "Destructive membership SQL detected"
             exit 1
           fi
