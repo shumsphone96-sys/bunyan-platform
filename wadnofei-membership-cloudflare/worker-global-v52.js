@@ -1,3 +1,4 @@
+import { adminGate as checkedAdminGate } from './auth.js';
 import app from './worker-global-v51.js';
 
 const CLUB='نادي ود نفيع الرياضي الثقافي الاجتماعي';
@@ -26,14 +27,7 @@ export default {
   async scheduled(e,env,ctx){if(app.scheduled)return app.scheduled(e,env,ctx)}
 };
 
-async function adminGate(req,env,ctx){
-  try{
-    const u=new URL(req.url);u.pathname='/club-admin';u.search='';
-    const probe=await app.fetch(new Request(u.toString(),req),env,ctx);
-    if(probe.status>=300&&probe.status<400)return new Response(null,{status:303,headers:{location:probe.headers.get('location')||'/login'}});
-  }catch(_){return red('/login')}
-  return null;
-}
+async function adminGate(req,env,ctx){return checkedAdminGate(req,env)}
 
 async function whatsappStatus(env){
   const configured=Boolean(env.WHATSAPP_TOKEN&&env.WHATSAPP_PHONE_NUMBER_ID&&env.WHATSAPP_BUSINESS_ACCOUNT_ID);

@@ -1,3 +1,4 @@
+import { getActor } from './auth.js';
 import app from './worker-global-v62.js';
 
 const CLUB='نادي ود نفيع الرياضي الثقافي الاجتماعي';
@@ -31,12 +32,6 @@ export default {
       if(['/','/about','/activities','/contact','/news','/team','/board','/achievements'].includes(p)){
         html=html.replace('</nav>','<a href="/projects">المشروعات</a><a href="/events">الفعاليات</a><a href="/sponsors">الداعمون</a><a href="/gallery">الصور</a></nav>');
       }
-      if(p==='/'){
-        const news=env.DB?await many(env.DB,`SELECT * FROM club_news WHERE is_published=1 ORDER BY id DESC LIMIT 3`):[];
-        const projects=env.DB?await many(env.DB,`SELECT * FROM club_projects WHERE is_published=1 ORDER BY id DESC LIMIT 3`):[];
-        const dynamic=`<section style="width:min(1100px,94%);margin:34px auto"><h2 style="color:#0a347c">آخر الأخبار</h2><div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px">${news.length?news.map(x=>`<article style="background:#fff;border-radius:18px;padding:18px;box-shadow:0 10px 30px #0a347c14"><small>${esc(x.category||'عام')}</small><h3>${esc(x.title)}</h3><p>${esc(x.body||'')}</p></article>`).join(''):'<article style="background:#fff;border-radius:18px;padding:18px">قريبًا ننشر آخر أخبار النادي هنا.</article>'}</div><div style="margin-top:12px"><a href="/news">كل الأخبار ←</a></div></section><section style="width:min(1100px,94%);margin:34px auto"><h2 style="color:#0a347c">مشروعات ومبادرات النادي</h2><div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px">${projects.length?projects.map(x=>`<article style="background:#061a43;color:#fff;border-radius:18px;padding:18px"><span style="color:#f1c43d">${esc(x.status||'قيد التنفيذ')}</span><h3>${esc(x.title)}</h3><p>${esc(x.summary||'')}</p></article>`).join(''):'<article style="background:#061a43;color:#fff;border-radius:18px;padding:18px">سيتم عرض مشروعات النادي ومبادراته هنا.</article>'}</div><div style="margin-top:12px"><a href="/projects">كل المشروعات ←</a></div></section>`;
-        html=html.includes('</main>')?html.replace('</main>',dynamic+'</main>'):html+dynamic;
-      }
       if(p==='/club-admin'){
         const block='<section style="margin:18px 0;padding:16px;border:1px solid #d5a92888;border-radius:18px;background:#08265dcc"><h2 style="color:#d5a928">إدارة الواجهة العامة المتقدمة</h2><p>المشروعات، الفعاليات، الداعمون ومعرض الصور.</p><a href="/club-admin/public" style="display:block;text-align:center;padding:12px;border-radius:12px;background:#d5a928;color:#061a43;text-decoration:none;font-weight:900">فتح الإدارة العامة</a></section>';
         html=html.includes('</main>')?html.replace('</main>',block+'</main>'):html+block;
@@ -59,7 +54,7 @@ async function ensure(db){
   ];
   for(const q of qs){try{await db.prepare(q).run()}catch(_){}}
 }
-async function adminSession(req,db){const c=req.headers.get('cookie')||'',x=c.match(/(?:^|;\s*)sid=([^;]+)/);if(!x)return null;const t=decodeURIComponent(x[1]);try{const a=await db.prepare(`SELECT a.id,a.username FROM sessions s JOIN admins a ON a.id=s.admin_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(t).first();if(a)return a}catch(_){}try{return await db.prepare(`SELECT u.id,u.username FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(t).first()}catch(_){return null}}
+async function adminSession(req,db){return getActor(req,db)}
 async function many(db,q,b=[]){try{return (await db.prepare(q).bind(...b).all()).results||[]}catch(_){return []}}
 async function audit(db,a,action,type,id,details=''){try{await db.prepare(`INSERT INTO club_audit_log(actor,action,entity_type,entity_id,details) VALUES(?,?,?,?,?)`).bind(a?.username||'admin',action,type,String(id||''),details).run()}catch(_){}}
 

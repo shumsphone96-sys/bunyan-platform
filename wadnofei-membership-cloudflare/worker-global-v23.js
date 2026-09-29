@@ -45,14 +45,16 @@ export default {
     }
 
     const stage = path.match(/^\/applications\/(\d+)\/stage\/(received|review|needs-info|ready|approve|reject)$/);
+    const beforeStage = stage && method === 'POST' && env.DB ? await env.DB.prepare('SELECT status,review_stage,admin_note FROM applications WHERE id=?').bind(Number(stage[1])).first() : null;
     const response = await app.fetch(req, env, ctx);
 
     if (joinPost && response.status === 201 && env.DB && joinData?.phone) {
       ctx.waitUntil(afterNewApplication(env, joinData));
     }
 
-    if (stage && method === 'POST' && response.status < 400 && env.DB) {
-      ctx.waitUntil(afterStageChange(env, Number(stage[1]), stage[2]));
+    if (stage && method === 'POST' && response.status < 400 && beforeStage && env.DB) {
+      const after = await env.DB.prepare('SELECT status,review_stage,admin_note FROM applications WHERE id=?').bind(Number(stage[1])).first();
+      if (after && JSON.stringify(beforeStage)!==JSON.stringify(after)) ctx.waitUntil(afterStageChange(env, Number(stage[1]), stage[2]));
     }
 
     if (path === '/club-admin/notifications' && method === 'GET' && response.headers.get('content-type')?.includes('text/html')) {
@@ -99,7 +101,7 @@ async function afterNewApplication(env, submitted){
   } catch (_) {}
 }
 
-async function afterStageChange(env, applicationId, action){
+export async function afterStageChange(env, applicationId, action){
   try {
     const row = await env.DB.prepare(`SELECT id,application_no,full_name,phone,admin_note,status,review_stage FROM applications WHERE id=?`).bind(applicationId).first();
     if (!row) return;
@@ -133,10 +135,11 @@ async function queueAndSend(env, row, eventType, message){
 
   let insertedId = null;
   try {
-    const result = await env.DB.prepare(`INSERT INTO club_notifications(application_id,application_no,member_name,target_phone,actual_recipient,event_type,message,status) VALUES(?,?,?,?,?,?,?,'queued')`).bind(row.id,row.application_no,row.full_name,targetPhone,actualRecipient,eventType,message).run();
-    insertedId = result?.meta?.last_row_id || null;
+    const result = await env.DB.prepare(`INSERT INTO club_notifications(application_id,application_no,member_name,target_phone,actual_recipient,event_type,message,status) SELECT ?,?,?,?,?,?,?,'queued' WHERE ? NOT IN ('application_received','membership_approved') OR NOT EXISTS(SELECT 1 FROM club_notifications WHERE application_id=? AND event_type=?)`).bind(row.id,row.application_no,row.full_name,targetPhone,actualRecipient,eventType,message,eventType,row.id,eventType).run();
+    insertedId = Number(result?.meta?.changes || 0)>0 ? result.meta.last_row_id : null;
   } catch (_) {}
 
+  if (!insertedId) return; // No unlogged or duplicate sends.
   let sent = await sendWhatsAppTemplate(env, actualRecipient, eventType, row);
   if (!sent.ok && sent.code === 132001) {
     const universal = await sendUniversalTemplate(env, actualRecipient, eventType, row);
@@ -162,6 +165,7 @@ async function queueAndSend(env, row, eventType, message){
 }
 
 async function sendWhatsAppTemplate(env,to,eventType,row){
+  if (env.WHATSAPP_MODE === 'disabled') return {ok:false,error:'WhatsApp sending disabled'};
   if (!env.WHATSAPP_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) return {ok:false,error:'WhatsApp credentials incomplete'};
   const cfg=TEMPLATES[eventType];
   if (!cfg) return {ok:false,error:`No WhatsApp template configured for ${eventType}`};
@@ -193,6 +197,7 @@ async function sendWhatsAppTemplate(env,to,eventType,row){
 }
 
 async function sendUniversalTemplate(env,to,eventType,row){
+  if (env.WHATSAPP_MODE === 'disabled') return {ok:false,error:'WhatsApp sending disabled'};
   if (!env.WHATSAPP_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) return {ok:false,error:'WhatsApp credentials incomplete'};
   const params=[row.application_no||'—',EVENT_LABELS[eventType]||'يوجد تحديث جديد على الطلب'].map(v=>({type:'text',text:String(v)}));
   try{
@@ -208,6 +213,7 @@ async function sendUniversalTemplate(env,to,eventType,row){
 }
 
 async function sendWhatsAppText(env,to,message){
+  if (env.WHATSAPP_MODE === 'disabled') return {ok:false,error:'WhatsApp sending disabled'};
   if (!env.WHATSAPP_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) return {ok:false,error:'WhatsApp credentials incomplete'};
   try{
     const r=await fetch(`https://graph.facebook.com/${META_VERSION}/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`,{

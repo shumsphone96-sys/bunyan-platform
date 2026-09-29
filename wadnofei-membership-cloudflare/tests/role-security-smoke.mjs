@@ -38,6 +38,6 @@ assert.doesNotMatch(v71,/DELETE\s+FROM\s+(members|applications)/i);
 assert.match(v72,/recovery_contact_hash/);
 assert.match(v72,/DELETE FROM club_staff_sessions WHERE user_id=\?/);
 assert.match(v73,/release-readiness/);
-assert.match(index,/worker-global-v81\.js/);
+assert.match(index,/worker-global-v82\.js/);
 
 console.log('Role/security/privacy smoke tests passed.');

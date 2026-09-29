@@ -1,3 +1,4 @@
+import { getActor } from './auth.js';
 import app from './worker-global-v26.js';
 
 const META_VERSION='v22.0';
@@ -17,7 +18,7 @@ export default {
     const url=new URL(req.url);
     const path=url.pathname.replace(/\/$/,'')||'/';
     if(path==='/club-admin/whatsapp-templates'){
-      if(!hasAdminCookie(req)) return new Response(null,{status:303,headers:{Location:'/login'}});
+      if(!(await getActor(req,env.DB))) return new Response(null,{status:303,headers:{Location:'/login'}});
       if(req.method==='POST') return createTemplates(env);
       return templatesPage(env,url.searchParams.get('ok'),url.searchParams.get('error'));
     }

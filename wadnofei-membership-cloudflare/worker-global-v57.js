@@ -1,3 +1,4 @@
+import { getActor } from './auth.js';
 import app from './worker-global-v56.js';
 
 const CLUB='نادي ود نفيع الرياضي الثقافي الاجتماعي';
@@ -53,11 +54,7 @@ async function ensureV57(db){
   }
 }
 
-async function adminSession(req,db){
-  const c=req.headers.get('cookie')||'',x=c.match(/(?:^|;\s*)sid=([^;]+)/);if(!x)return null;const t=decodeURIComponent(x[1]);
-  try{const a=await db.prepare(`SELECT a.id,a.username,COALESCE(a.role,'owner') role FROM sessions s JOIN admins a ON a.id=s.admin_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(t).first();if(a)return a}catch(_){}
-  try{return await db.prepare(`SELECT u.id,u.username,COALESCE(u.role,'admin') role FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(t).first()}catch(_){return null}
-}
+async function adminSession(req,db){return getActor(req,db)}
 async function cols(db,t){try{const r=await db.prepare(`PRAGMA table_info(${t})`).all();return new Set((r.results||[]).map(x=>x.name))}catch(_){return new Set()}}
 async function one(db,q,b=[]){try{return await db.prepare(q).bind(...b).first()}catch(_){return null}}
 async function many(db,q,b=[]){try{return (await db.prepare(q).bind(...b).all()).results||[]}catch(_){return []}}
