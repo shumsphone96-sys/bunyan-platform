@@ -3,13 +3,11 @@ export async function approveMembership(db, id, actor, note='') {
   if (!Number.isSafeInteger(id) || id < 1) throw new Error('INVALID_APPLICATION');
   const appCols = await columns(db,'applications');
   const memberCols = await columns(db,'members');
-  for (const [name,type] of [['member_id','INTEGER'],['review_stage','TEXT'],['admin_note','TEXT'],['decided_at','TEXT'],['updated_at','TEXT'],['reviewed_at','TEXT']]) {
-    if (!appCols.has(name)) await db.prepare(`ALTER TABLE applications ADD COLUMN ${name} ${type}`).run();
+  const requiredApp=['member_id','review_stage','admin_note','decided_at','updated_at','reviewed_at'];
+  const requiredMember=['application_id','qr_token','approved_at','created_at','membership_expires_at','card_issued_at'];
+  if(requiredApp.some(name=>!appCols.has(name))||requiredMember.some(name=>!memberCols.has(name))){
+    throw new Error('MEMBERSHIP_SCHEMA_OUTDATED');
   }
-  for (const name of ['qr_token','approved_at','created_at','membership_expires_at','card_issued_at']) {
-    if (!memberCols.has(name)) { await db.prepare(`ALTER TABLE members ADD COLUMN ${name} TEXT`).run(); memberCols.add(name); }
-  }
-  await db.prepare(`CREATE TABLE IF NOT EXISTS club_audit_log(id INTEGER PRIMARY KEY AUTOINCREMENT,actor TEXT,action TEXT,entity_type TEXT,entity_id TEXT,details TEXT,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`).run();
   const ap = await db.prepare('SELECT * FROM applications WHERE id=?').bind(id).first();
   if (!ap) return {status:404, error:'طلب العضوية غير موجود.'};
   if (!['pending','approved'].includes(ap.status)) return {status:409,error:'لا يمكن اعتماد طلب مرفوض من مسار إصدار البطاقة.'};
@@ -17,7 +15,6 @@ export async function approveMembership(db, id, actor, note='') {
   if (linked.length > 1 || (linked[0]?.application_id && Number(linked[0].application_id)!==id)) return {status:409,error:'توجد روابط عضوية متعارضة؛ يلزم مراجعتها دون حذف أي سجل.'};
   if (ap.status === 'approved' && !linked.length) return {status:409,error:'طلب معتمد دون سجل عضوية مرتبط؛ يلزم مراجعته قبل إصدار رقم آخر.'};
   // Existing duplicates stop approval. Never delete or merge personal data automatically.
-  await db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS wdn_one_member_per_application ON members(application_id) WHERE application_id IS NOT NULL').run();
   const token = crypto.randomUUID().replaceAll('-','');
   const temporary = 'WDN-TMP-' + token;
   const now = new Date().toISOString();
