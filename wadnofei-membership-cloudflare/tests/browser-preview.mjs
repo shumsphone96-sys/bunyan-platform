@@ -3,7 +3,7 @@ import {existsSync} from 'node:fs';
 import puppeteer from 'puppeteer-core';
 
 const base=String(process.env.PREVIEW_BASE||'').replace(/\/$/,'');
-assert.ok(/^https:\/\//.test(base),'PREVIEW_BASE must be https');
+assert.ok(/^https:\/\//.test(base)||/^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/.test(base),'PREVIEW_BASE must be https or loopback http');
 const candidates=[
  process.env.CHROME_PATH,
  '/usr/bin/google-chrome',
