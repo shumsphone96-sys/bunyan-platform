@@ -1,4 +1,5 @@
 import app from './worker-global-v82.js';
+import {ensureCore} from './core-schema.js';
 
 const ORIGIN='https://members.shamsphone.net';
 const RELEASE='v83-production-hardening';
@@ -13,6 +14,7 @@ const PUBLIC_ROUTES=[
 async function ensureReleaseSchema(db){
   if(!releaseSchemaReady.has(db)){
     releaseSchemaReady.set(db,(async()=>{
+      await ensureCore(db);
       const duplicate=await db.prepare(
         "SELECT application_id,COUNT(*) c FROM members WHERE application_id IS NOT NULL GROUP BY application_id HAVING COUNT(*)>1 LIMIT 1"
       ).first();
