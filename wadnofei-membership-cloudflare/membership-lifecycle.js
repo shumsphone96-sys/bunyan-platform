@@ -8,6 +8,8 @@ export async function approveMembership(db, id, actor, note='') {
   if(requiredApp.some(name=>!appCols.has(name))||requiredMember.some(name=>!memberCols.has(name))){
     throw new Error('MEMBERSHIP_SCHEMA_OUTDATED');
   }
+  const indexes=(await db.prepare("PRAGMA index_list(members)").all()).results.map(x=>x.name);
+  if(!indexes.includes('wdn_one_member_per_application'))throw new Error('MEMBERSHIP_CONSTRAINT_MISSING');
   const ap = await db.prepare('SELECT * FROM applications WHERE id=?').bind(id).first();
   if (!ap) return {status:404, error:'طلب العضوية غير موجود.'};
   if (!['pending','approved'].includes(ap.status)) return {status:409,error:'لا يمكن اعتماد طلب مرفوض من مسار إصدار البطاقة.'};
