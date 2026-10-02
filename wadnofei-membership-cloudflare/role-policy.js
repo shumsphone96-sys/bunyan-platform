@@ -14,7 +14,8 @@ export function classifyAdminPath(path){
   // Shared personal pages only.
   if(['/club-admin','/club-admin/my-workspace','/club-admin/security'].includes(p))return'common';
 
-  // Finance owns financial work end-to-end.
+  // Finance owns financial work end-to-end, including renewing a member's paid subscription.
+  if(/^\/club-admin\/members\/\d+\/renew$/.test(p))return'finance';
   if(/^\/club-admin\/(finance|payments|receipts|expenses|income|memberships|ledger|reports)(\/|$)/.test(p))return'finance';
 
   // Secretariat owns correspondence, membership processing and club documents.

@@ -1,3 +1,4 @@
+import { getActor } from './auth.js';
 import app from './worker-global-v55.js';
 
 const CLUB='نادي ود نفيع الرياضي الثقافي الاجتماعي';
@@ -26,11 +27,7 @@ export default {
   async scheduled(e,env,ctx){if(app.scheduled)return app.scheduled(e,env,ctx)}
 };
 
-async function adminSession(req,db){
-  if(!db)return null;const c=req.headers.get('cookie')||'',x=c.match(/(?:^|;\s*)sid=([^;]+)/);if(!x)return null;const t=decodeURIComponent(x[1]);
-  try{const a=await db.prepare(`SELECT a.id,a.username FROM sessions s JOIN admins a ON a.id=s.admin_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(t).first();if(a)return a}catch(_){}
-  try{return await db.prepare(`SELECT u.id,u.username FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(t).first()}catch(_){return null}
-}
+async function adminSession(req,db){return getActor(req,db)}
 
 async function cols(db,t){try{const r=await db.prepare(`PRAGMA table_info(${t})`).all();return new Set((r.results||[]).map(x=>x.name))}catch(_){return new Set()}}
 async function count(db,q,bind=[]){try{const r=await db.prepare(q).bind(...bind).first();return Number(r?.c||0)}catch(_){return 0}}

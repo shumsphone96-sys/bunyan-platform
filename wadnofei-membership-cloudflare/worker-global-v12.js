@@ -1,3 +1,4 @@
+import { getActor } from './auth.js';
 import app from './worker-global-v11.js';
 
 const CLUB='نادي ود نفيع الرياضي الثقافي الاجتماعي';
@@ -35,7 +36,7 @@ async function init(db){for(const q of [
 `CREATE TABLE IF NOT EXISTS club_meetings(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL,meeting_date TEXT,location TEXT,agenda TEXT,decisions TEXT,created_at TEXT DEFAULT CURRENT_TIMESTAMP)`,
 `CREATE TABLE IF NOT EXISTS club_committees(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,chair TEXT,members TEXT,responsibilities TEXT,status TEXT DEFAULT 'active',created_at TEXT DEFAULT CURRENT_TIMESTAMP)`,
 `CREATE TABLE IF NOT EXISTS club_tasks(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL,assigned_to TEXT,due_date TEXT,status TEXT DEFAULT 'open',notes TEXT,created_at TEXT DEFAULT CURRENT_TIMESTAMP)`]){try{await db.prepare(q).run()}catch(_){}}}
-async function admin(req,db){let c=req.headers.get('Cookie')||'',x=c.match(/(?:^|;\s*)sid=([^;]+)/);if(!x)return null;return db.prepare(`SELECT a.id,a.username,COALESCE(a.role,'owner') role FROM sessions s JOIN admins a ON a.id=s.admin_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(decodeURIComponent(x[1])).first()}
+async function admin(req,db){return getActor(req,db)}
 async function log(db,a,action,target){try{await db.prepare(`INSERT INTO audit_log(admin_id,username,role,action,target_type,created_at) VALUES(?,?,?,?,?,CURRENT_TIMESTAMP)`).bind(a.id,a.username,a.role,action,target).run()}catch(_){}}
 
 async function meetings(db){let r=await db.prepare('SELECT * FROM club_meetings ORDER BY id DESC LIMIT 300').all();return H(page('الاجتماعات والقرارات',form('/club-admin/meetings',[['عنوان الاجتماع','title',1],['التاريخ والوقت','meeting_date'],['المكان','location'],['جدول الأعمال','agenda'],['القرارات','decisions']],'حفظ الاجتماع')+cards(r.results,x=>`<b>${e(x.title)}</b><span>${e(x.meeting_date||'—')} · ${e(x.location||'')}</span><small>${e(x.decisions||x.agenda||'')}</small>`)))}

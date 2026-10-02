@@ -1,3 +1,4 @@
+import { getActor } from './auth.js';
 import app from './worker-global-v8.js';
 
 const C='نادي ود نفيع الرياضي الثقافي الاجتماعي';
@@ -37,7 +38,7 @@ async function init(db){for(const q of [
 `CREATE TABLE IF NOT EXISTS club_activities(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT,activity_type TEXT,event_date TEXT,location TEXT,status TEXT DEFAULT 'planned',notes TEXT,created_at TEXT DEFAULT CURRENT_TIMESTAMP)`,
 `CREATE TABLE IF NOT EXISTS club_finance(id INTEGER PRIMARY KEY AUTOINCREMENT,entry_type TEXT,category TEXT,amount REAL,reference_no TEXT,notes TEXT,created_at TEXT DEFAULT CURRENT_TIMESTAMP)`,
 `CREATE TABLE IF NOT EXISTS club_news(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT,body TEXT,status TEXT DEFAULT 'draft',created_at TEXT DEFAULT CURRENT_TIMESTAMP)`]){try{await db.prepare(q).run()}catch(_){}}}
-async function admin(req,db){let c=req.headers.get('Cookie')||'',x=c.match(/(?:^|;\s*)sid=([^;]+)/);if(!x)return null;return db.prepare(`SELECT a.id,a.username,COALESCE(a.role,'owner') role FROM sessions s JOIN admins a ON a.id=s.admin_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(decodeURIComponent(x[1])).first()}
+async function admin(req,db){return getActor(req,db)}
 async function log(db,a,action,target='club'){try{await db.prepare(`INSERT INTO audit_log(admin_id,username,role,action,target_type,created_at) VALUES(?,?,?,?,?,CURRENT_TIMESTAMP)`).bind(a.id,a.username,a.role,action,target).run()}catch(_){}}
 
 async function dash(db,a){let [pl,as,dc,ac,fi,nw]=await Promise.all([count(db,'club_players'),count(db,'club_assets'),count(db,'club_documents'),count(db,'club_activities'),sum(db),count(db,'club_news')]);return H(page('مركز إدارة النادي',`<section class="hero"><h1>مركز إدارة نادي ود نفيع</h1><p>إدارة النادي من مكان واحد: رياضة، أصول، وثائق، نشاط، مال، إعلام، ورقابة.</p></section><div class="stats">${st('اللاعبون',pl)}${st('الأصول',as)}${st('الوثائق',dc)}${st('الأنشطة',ac)}${st('صافي الحركة المالية',money(fi))}${st('الأخبار',nw)}</div><div class="grid">${tile('/club-admin/players','اللاعبون والجهاز الفني','سجل الفريق والبيانات الأساسية')}${tile('/club-admin/assets','أصول النادي','العهد والمعدات والممتلكات')}${tile('/club-admin/documents','الوثائق','القرارات والمحاضر والخطابات')}${tile('/club-admin/activities','الأنشطة','الرياضي والثقافي والاجتماعي')}${tile('/club-admin/finance','المالية','إيرادات ومصروفات ومستندات')}${tile('/club-admin/news','الإعلام والأخبار','أرشيف الأخبار والمنشورات')}${tile('/club-admin/audit','سجل التدقيق','من فعل ماذا ومتى')}</div>`))}
@@ -58,7 +59,7 @@ async function finance(db,a){let r=await db.prepare('SELECT * FROM club_finance 
 async function addFinance(req,db,a){let f=await req.formData();await db.prepare('INSERT INTO club_finance(entry_type,category,amount,reference_no,notes) VALUES(?,?,?,?,?)').bind(v(f,'entry_type'),v(f,'category'),Number(v(f,'amount')||0),v(f,'reference_no'),v(f,'notes')).run();await log(db,a,'add_finance','finance');return red('/club-admin/finance')}
 
 async function news(db,a){let r=await db.prepare('SELECT * FROM club_news ORDER BY id DESC LIMIT 300').all();return H(page('الإعلام والأخبار',`<form class="form" method="post" action="/club-admin/news"><label>العنوان<input name="title" required></label><label>النص<textarea name="body" rows="6" required></textarea></label><label>الحالة<input name="status" value="draft" placeholder="مسودة / منشور"></label><button>حفظ الخبر</button></form>`+cards(r.results,x=>`<b>${e(x.title)}</b><span>${e(x.status)}</span><small>${e(x.body).slice(0,120)}</small>`)))}
-async function addNews(req,db,a){let f=await req.formData();await db.prepare('INSERT INTO club_news(title,body,status) VALUES(?,?,?)').bind(v(f,'title'),v(f,'body'),v(f,'status')||'draft').run();await log(db,a,'add_news','news');return red('/club-admin/news')}
+async function addNews(req,db,a){let f=await req.formData();await db.prepare('INSERT INTO club_news(title,body,status,is_published) VALUES(?,?,?,?)').bind(v(f,'title'),v(f,'body'),v(f,'status')||'draft',['published','منشور'].includes(v(f,'status'))?1:0).run();await log(db,a,'add_news','news');return red('/club-admin/news')}
 
 async function audit(db,a){let r;try{r=await db.prepare('SELECT * FROM audit_log ORDER BY id DESC LIMIT 500').all()}catch(_){r={results:[]}}return H(page('سجل التدقيق',cards(r.results,x=>`<b>${e(x.username||'النظام')} · ${e(x.action)}</b><span>${e(x.target_type||'')}</span><small>${e(x.created_at||'')}</small>`)))}
 

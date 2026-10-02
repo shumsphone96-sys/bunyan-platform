@@ -1,3 +1,4 @@
+import { getActor } from './auth.js';
 import app from './worker-global-v6.js';
 
 const ROLE_LABELS={owner:'مدير النظام',reviewer:'مراجع العضوية',approver:'معتمد العضوية'};
@@ -60,12 +61,7 @@ async function ensureV7(db){
   )`).run()}catch(_){}
 }
 
-async function currentAdmin(req,db){
-  const cookie=req.headers.get('Cookie')||'';
-  const m=cookie.match(/(?:^|;\s*)sid=([^;]+)/);
-  if(!m)return null;
-  return db.prepare(`SELECT a.id,a.username,COALESCE(a.role,'owner') role FROM sessions s JOIN admins a ON a.id=s.admin_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(decodeURIComponent(m[1])).first();
-}
+async function currentAdmin(req,db){return getActor(req,db)}
 
 function allowed(role,action){
   role=role||'owner';

@@ -1,7 +1,7 @@
+import { getActor } from './auth.js';
 const CLUB='نادي ود نفيع الرياضي الثقافي الاجتماعي';
 const SHORT='نادي ود نفيع';
 const ADMIN='admin';
-const TEMP='ChangeMe123!';
 const EST='1964';
 const LOGO_B64='[omitted in summary payload]';
 
@@ -95,11 +95,10 @@ async function init(db){
     db.prepare(`CREATE INDEX IF NOT EXISTS idx_members_no ON members(member_no)`),
     db.prepare(`CREATE INDEX IF NOT EXISTS idx_pay_member ON payments(member_id)`)
   ]);
-  let x=await db.prepare('SELECT id FROM admins WHERE username=?').bind(ADMIN).first();
-  if(!x) await db.prepare('INSERT INTO admins(username,password_hash,must_change) VALUES(?,?,1)').bind(ADMIN,await hash(TEMP)).run();
+  // Initial administrators are provisioned explicitly, never with a public fallback password.
 }
 
-async function session(req,db){const c=cookies(req.headers.get('Cookie')||'');if(!c.sid) return null;return db.prepare(`SELECT a.id,a.username,a.must_change FROM sessions s JOIN admins a ON a.id=s.admin_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(c.sid).first();}
+async function session(req,db){return getActor(req,db)}
 async function doLogin(req,db){const f=await req.formData(),u=T(f,'username'),p=T(f,'password');const a=await db.prepare('SELECT * FROM admins WHERE username=?').bind(u).first();if(!a||await hash(p)!==a.password_hash) return H(login('بيانات الدخول غير صحيحة'));const t=token(),ex=new Date(Date.now()+604800000).toISOString();await db.prepare('INSERT INTO sessions(token,admin_id,expires_at) VALUES(?,?,?)').bind(t,a.id,ex).run();await log(db,a.id,'تسجيل دخول','دخول إلى لوحة الإدارة');return new Response(null,{status:303,headers:{Location:a.must_change?'/change-password':'/','Set-Cookie':`sid=${t}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=604800`}})}
 async function doChange(req,db,s){const f=await req.formData(),p=T(f,'password'),c=T(f,'confirm');if(p.length<8||p!==c) return H(shell(changePass('كلمتا المرور غير متطابقتين أو أقل من 8 أحرف.'),s,'الإعدادات'));await db.prepare('UPDATE admins SET password_hash=?,must_change=0 WHERE id=?').bind(await hash(p),s.id).run();await log(db,s.id,'تغيير كلمة المرور','تم تغيير كلمة مرور حساب الإدارة');return R('/')}
 

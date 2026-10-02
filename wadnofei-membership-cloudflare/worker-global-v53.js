@@ -1,3 +1,4 @@
+import { adminGate as checkedAdminGate } from './auth.js';
 import app from './worker-global-v52.js';
 
 const CLUB='نادي ود نفيع الرياضي الثقافي الاجتماعي';
@@ -28,14 +29,7 @@ export default {
   async scheduled(e,env,ctx){if(app.scheduled)return app.scheduled(e,env,ctx)}
 };
 
-async function adminGate(req,env,ctx){
-  try{
-    const u=new URL(req.url);u.pathname='/club-admin';u.search='';
-    const probe=await app.fetch(new Request(u.toString(),req),env,ctx);
-    if(probe.status>=300&&probe.status<400)return new Response(null,{status:303,headers:{location:probe.headers.get('location')||'/login'}});
-  }catch(_){return new Response(null,{status:303,headers:{location:'/login'}})}
-  return null;
-}
+async function adminGate(req,env,ctx){return checkedAdminGate(req,env)}
 
 function verifyWebhook(u,env){
   const mode=u.searchParams.get('hub.mode');
@@ -70,13 +64,13 @@ async function receiveWebhook(req,env){
       const ts=s.timestamp?new Date(Number(s.timestamp)*1000).toISOString():new Date().toISOString();
       const err=(s.errors||[]).map(x=>[x.title,x.message,x.code].filter(Boolean).join(' / ')).join(' | ')||null;
       if(st==='delivered'){
-        await env.DB.prepare(`UPDATE club_notifications SET provider_status='delivered',status='delivered',delivered_at=COALESCE(delivered_at,?),status_updated_at=?,error=NULL WHERE provider_message_id=?`).bind(ts,ts,id).run();
+        await env.DB.prepare(`UPDATE club_notifications SET provider_status='delivered',status='delivered',delivered_at=COALESCE(delivered_at,?),status_updated_at=?,error=NULL WHERE provider_message_id=? AND status<>'read'`).bind(ts,ts,id).run();
       }else if(st==='read'){
         await env.DB.prepare(`UPDATE club_notifications SET provider_status='read',status='read',delivered_at=COALESCE(delivered_at,?),read_at=COALESCE(read_at,?),status_updated_at=?,error=NULL WHERE provider_message_id=?`).bind(ts,ts,ts,id).run();
       }else if(st==='failed'){
-        await env.DB.prepare(`UPDATE club_notifications SET provider_status='failed',status='failed',status_updated_at=?,error=COALESCE(?,error) WHERE provider_message_id=?`).bind(ts,err,id).run();
+        await env.DB.prepare(`UPDATE club_notifications SET provider_status='failed',status='failed',status_updated_at=?,error=COALESCE(?,error) WHERE provider_message_id=? AND status NOT IN ('delivered','read')`).bind(ts,err,id).run();
       }else if(st==='sent'){
-        await env.DB.prepare(`UPDATE club_notifications SET provider_status='sent',status_updated_at=? WHERE provider_message_id=?`).bind(ts,id).run();
+        await env.DB.prepare(`UPDATE club_notifications SET provider_status='sent',status_updated_at=? WHERE provider_message_id=? AND status NOT IN ('delivered','read')`).bind(ts,id).run();
       }
     }
   }catch(_){ }

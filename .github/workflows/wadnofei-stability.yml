@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - wadnofei-stability-v1
+      - improve/wadnofei-site-review-20260926
     paths:
       - 'wadnofei-membership-cloudflare/**'
       - '.github/workflows/wadnofei-stability.yml'
@@ -22,6 +23,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install deployment dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Install membership test dependencies
+        run: npm ci --prefix wadnofei-membership-cloudflare --no-audit --no-fund
+
+      - name: Bundle Worker through deployment config
+        run: npx wrangler deploy --dry-run --config wadnofei-membership-cloudflare/wrangler.jsonc --outdir /tmp/wdn-compiled
+
       - name: Check JavaScript syntax
         run: |
           set -e
@@ -34,21 +49,106 @@ jobs:
           node --check wadnofei-membership-cloudflare/worker-global-v72.js
           node --check wadnofei-membership-cloudflare/worker-global-v73.js
           node --check wadnofei-membership-cloudflare/src/index.js
+          for file in wadnofei-membership-cloudflare/worker-global-v7{4,5,6,7,8,9}.js wadnofei-membership-cloudflare/worker-global-v80.js wadnofei-membership-cloudflare/worker-global-v81.js wadnofei-membership-cloudflare/worker-global-v82.js wadnofei-membership-cloudflare/site-*.js wadnofei-membership-cloudflare/public-site.js; do node --check "$file"; done
 
       - name: Run role, security, and privacy smoke tests
         run: |
           set -e
           node wadnofei-membership-cloudflare/tests/role-security-smoke.mjs
+          node wadnofei-membership-cloudflare/tests/site-review.mjs
+          node wadnofei-membership-cloudflare/tests/auth-recovery-v79.mjs
+          node wadnofei-membership-cloudflare/tests/legacy-auth-v80.mjs
+          node wadnofei-membership-cloudflare/tests/auth-cookie-v81.mjs
+          npm test --prefix wadnofei-membership-cloudflare
+          WDN_TEST_COMPATIBILITY_DATE=2026-08-06 node --experimental-vm-modules wadnofei-membership-cloudflare/tests/runtime.e2e.mjs
+          npm audit --omit=dev --prefix wadnofei-membership-cloudflare
+
+      - name: Smoke test Cloudflare branch preview
+        env:
+          PREVIEW_BASE: https://improve-wadnofei-site-review-20260926-wadnofei-membership.shumsphone96.workers.dev
+        run: |
+          set -euo pipefail
+          public_paths=(
+            "/" "/about" "/activities" "/contact" "/news" "/team" "/board"
+            "/achievements" "/projects" "/events" "/sponsors" "/gallery"
+            "/history" "/identity" "/constitution" "/membership"
+            "/membership/track" "/membership/payment" "/staff-login" "/staff-recover"
+          )
+          for path in "${public_paths[@]}"; do
+            echo "Checking preview route: $path"
+            code="$(curl --retry 3 --retry-delay 1 -L -sS -o /tmp/wdn-body -D /tmp/wdn-head -w '%{http_code}' "${PREVIEW_BASE}${path}")"
+            test "$code" = "200" || { echo "Unexpected HTTP $code for $path"; cat /tmp/wdn-head; grep -o '<h1[^>]*>[^<]*</h1>\|<h2[^>]*>[^<]*</h2>' /tmp/wdn-body | head -5 || true; exit 1; }
+            if ! grep -qi '^x-content-type-options: nosniff' /tmp/wdn-head; then
+              echo "Missing nosniff header for $path"
+              cat /tmp/wdn-head
+              exit 1
+            fi
+            if ! grep -qi '^content-type: text/html' /tmp/wdn-head || ! grep -qi '<html' /tmp/wdn-body; then
+              echo "Expected HTML response missing for $path"
+              cat /tmp/wdn-head
+              exit 1
+            fi
+            case "$path" in
+              "/"|"/about"|"/activities"|"/contact"|"/news"|"/team"|"/board"|"/achievements"|"/projects"|"/events"|"/sponsors"|"/gallery"|"/history"|"/identity")
+                if ! grep -qi '^x-wadnofei-ui: v78-organized-site' /tmp/wdn-head; then
+                  echo "V78 public UI marker missing for $path"
+                  cat /tmp/wdn-head
+                  exit 1
+                fi
+              ;;
+            esac
+            if [ "$path" = "/staff-login" ] || [ "$path" = "/staff-recover" ]; then
+              if ! grep -qi '^x-wadnofei-auth: v79-otp-recovery' /tmp/wdn-head; then
+                echo "V79 auth marker missing for $path"
+                cat /tmp/wdn-head
+                exit 1
+              fi
+            fi
+          done
+          curl --retry 3 --retry-delay 1 -sS -D /tmp/wdn-root-head -o /tmp/wdn-root-body "${PREVIEW_BASE}/"
+          grep -qi '^x-frame-options: DENY' /tmp/wdn-root-head
+          grep -qi '^content-security-policy: .*frame-ancestors' /tmp/wdn-root-head
+          admin_code="$(curl --retry 3 --retry-delay 1 -sS -o /dev/null -w '%{http_code}' "${PREVIEW_BASE}/club-admin/access/passwords")"
+          case "$admin_code" in 302|303) ;; *) echo "Protected admin route returned HTTP $admin_code"; exit 1;; esac
+
+          check_redirect() {
+            path="$1"
+            expected="$2"
+            curl --retry 3 --retry-delay 1 -sS -D /tmp/wdn-legacy-head -o /dev/null "${PREVIEW_BASE}${path}"
+            code="$(awk 'NR==1 {print $2}' /tmp/wdn-legacy-head)"
+            location="$(awk 'BEGIN{IGNORECASE=1} /^location:/ {sub(/\r$/,"",$2); print $2; exit}' /tmp/wdn-legacy-head)"
+            test "$code" = "303" || { echo "Legacy route $path returned HTTP $code"; cat /tmp/wdn-legacy-head; exit 1; }
+            test "$location" = "$expected" || { echo "Legacy route $path redirected to $location instead of $expected"; cat /tmp/wdn-legacy-head; exit 1; }
+            grep -qi '^x-wadnofei-auth: v80-legacy-auth-closed' /tmp/wdn-legacy-head
+          }
+          check_redirect "/login" "/staff-login?next=%2Fclub-admin"
+          check_redirect "/forgot-account" "/staff-recover"
+          check_redirect "/change-password" "/staff-security"
+          check_redirect "/logout" "/staff-logout"
+
+          curl --retry 3 --retry-delay 1 -sS -D /tmp/wdn-bad-cookie-head -o /tmp/wdn-bad-cookie-body -H 'Cookie: club_sid=%' "${PREVIEW_BASE}/staff-login"
+          grep -qi '^HTTP/.* 200' /tmp/wdn-bad-cookie-head
+          grep -qi '^x-wadnofei-auth-sanitize: v81' /tmp/wdn-bad-cookie-head
+          grep -qi '^x-wadnofei-release: v82-stability' /tmp/wdn-bad-cookie-head
+          grep -qi '^set-cookie: club_sid=;' /tmp/wdn-bad-cookie-head
+
+      - name: Install browser QA dependency
+        run: npm install --no-save --ignore-scripts --no-audit --no-fund puppeteer-core@24.16.0
+
+      - name: Browser responsive preview QA
+        env:
+          PREVIEW_BASE: https://improve-wadnofei-site-review-20260926-wadnofei-membership.shumsphone96.workers.dev
+        run: node wadnofei-membership-cloudflare/tests/browser-preview.mjs
 
       - name: Verify active worker version
         run: |
-          grep -F "worker-global-v73.js" wadnofei-membership-cloudflare/src/index.js
+          grep -F "worker-global-v82.js" wadnofei-membership-cloudflare/src/index.js
 
       - name: Block destructive membership SQL in new layers
         run: |
           set -e
-          if grep -Eni "DROP[[:space:]]+TABLE|DELETE[[:space:]]+FROM[[:space:]]+(members|applications)|TRUNCATE"             wadnofei-membership-cloudflare/worker-global-v7{1,2,3}.js; then
-            echo "Destructive SQL detected in v71-v73"
+          if grep -Eni "DROP[[:space:]]+TABLE|DELETE[[:space:]]+FROM[[:space:]]+(members|applications)|TRUNCATE"             wadnofei-membership-cloudflare/worker-global-v7{1,2,3,4,5,6,7,8,9}.js wadnofei-membership-cloudflare/worker-global-v80.js wadnofei-membership-cloudflare/worker-global-v81.js wadnofei-membership-cloudflare/worker-global-v82.js wadnofei-membership-cloudflare/public-site.js; then
+            echo "Destructive membership SQL detected"
             exit 1
           fi
 
@@ -64,4 +164,4 @@ jobs:
 
       - name: Summary
         run: |
-          echo "Wad Nofei stability gate passed: syntax, active entrypoint, non-destructive membership SQL, and required routes."
+          echo "Wad Nofei V82 stability gate passed: bundle, 77 tests, runtime E2E, role/privacy checks, non-destructive membership SQL, public routes, and responsive preview QA."

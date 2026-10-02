@@ -1,3 +1,4 @@
+import { getActor } from './auth.js';
 import base from './worker-global-v4.js';
 
 const CLUB='نادي ود نفيع الرياضي الثقافي الاجتماعي';
@@ -78,7 +79,7 @@ async function submitJoin(req, db) {
   const membership_type = text(f, 'membership_type');
   const notes = text(f, 'notes');
 
-  if (full_name.length < 4 || phone.length < 6) {
+  if (full_name.length < 4 || full_name.length > 160 || !/^[1-9][0-9]{7,14}$/.test(phone) || !['1','on','true'].includes(String(f.get('consent')||''))) {
     return html(joinPage('يرجى كتابة الاسم الكامل ورقم هاتف صحيح.', {full_name, phone, birth_date, address, occupation, membership_type, notes}), 400);
   }
 
@@ -87,13 +88,18 @@ async function submitJoin(req, db) {
     return html(successPage(duplicate.application_no, phone, true));
   }
 
-  const row = await db.prepare('SELECT COALESCE(MAX(id),0)+1 n FROM applications').first();
-  const no = 'WDN-REQ-' + String(Number(row?.n || 1)).padStart(5, '0');
-  await db.prepare(`INSERT INTO applications(application_no,full_name,phone,birth_date,address,occupation,membership_type,notes,status,review_stage,created_at,updated_at)
-    VALUES(?,?,?,?,?,?,?,?, 'pending','received',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`)
-    .bind(no, full_name, phone, birth_date, address, occupation, membership_type, notes).run();
-
-  return html(successPage(no, phone, false), 201);
+  const temporary='WDN-TMP-'+crypto.randomUUID().replaceAll('-','');
+  const result=await db.batch([
+    db.prepare(`INSERT INTO applications(application_no,full_name,phone,birth_date,address,occupation,membership_type,notes,status,review_stage,created_at,updated_at)
+      SELECT ?,?,?,?,?,?,?,?, 'pending','received',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP
+      WHERE NOT EXISTS(SELECT 1 FROM applications WHERE phone=? AND status='pending')`)
+      .bind(temporary,full_name,phone,birth_date,address,occupation,membership_type,notes,phone),
+    db.prepare("UPDATE applications SET application_no='WDN-REQ-'||printf('%05d',id) WHERE application_no=?").bind(temporary)
+  ]);
+  const created=Number(result[0]?.meta?.changes||0)===1;
+  const row=await db.prepare("SELECT application_no FROM applications WHERE phone=? AND status='pending' ORDER BY id DESC LIMIT 1").bind(phone).first();
+  if(!row)throw new Error('APPLICATION_NOT_COMMITTED');
+  return html(successPage(row.application_no,phone,!created),created?201:200);
 }
 
 async function submitTrack(req) {
@@ -192,7 +198,7 @@ function joinPage(msg='', vals={}) {
         ${field('نوع العضوية','membership_type',vals.membership_type,false,'text','حسب النظام الأساسي للنادي')}
       </div>
       <label>ملاحظات<textarea name="notes" rows="4">${esc(vals.notes || '')}</textarea></label>
-      <label class="consent"><input type="checkbox" required> أقر بأن البيانات المدخلة صحيحة، وأن تقديم الطلب لا يعني اعتماد العضوية إلا بعد مراجعة إدارة النادي.</label>
+      <label class="consent"><input type="checkbox" name="consent" value="1" required> أقر بأن البيانات المدخلة صحيحة، وأن تقديم الطلب لا يعني اعتماد العضوية إلا بعد مراجعة إدارة النادي.</label>
       <button class="primary" type="submit">إرسال طلب العضوية</button>
     </form>
     <div class="sub-actions"><a href="/membership/track">متابعة طلب سابق</a><a href="/club">العودة إلى موقع النادي</a></div>
@@ -280,12 +286,7 @@ function stageButton(id, action, label, cls='') {
   return `<form method="post" action="/applications/${id}/stage/${action}" class="stage-form ${needsNote?'with-note':''}">${needsNote?'<input name="admin_note" placeholder="اكتب الملاحظة للمتقدم" required>':''}<button class="mini ${cls}" type="submit">${label}</button></form>`;
 }
 
-async function adminSession(req, db) {
-  const cookie = req.headers.get('Cookie') || '';
-  const sid = cookie.split(';').map(x=>x.trim()).find(x=>x.startsWith('sid='))?.slice(4);
-  if (!sid) return null;
-  return db.prepare(`SELECT a.id,a.username,a.must_change FROM sessions s JOIN admins a ON a.id=s.admin_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(sid).first();
-}
+async function adminSession(req,db){return getActor(req,db)}
 
 function adminPage(title, body, admin) {
   return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)} - ${SHORT}</title><style>${css()}</style></head><body class="admin"><header class="adminbar"><a href="/" class="brand">${SHORT}</a><nav><a href="/">الرئيسية</a><a href="/applications">الطلبات</a><a href="/members">الأعضاء</a><a href="/payments">التحصيل</a><a href="/reports">التقارير</a><a href="/club" target="_blank">الموقع العام</a><a href="/logout">خروج</a></nav></header><main class="wrap">${body}</main><footer>${CLUB} · تأسس عام 1964</footer></body></html>`;

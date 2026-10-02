@@ -1,3 +1,4 @@
+import { getActor } from './auth.js';
 import app from './worker-global-v61.js';
 
 const CLUB='نادي ود نفيع الرياضي الثقافي الاجتماعي';
@@ -45,15 +46,24 @@ export default {
 
 async function ensure(db){
   const qs=[
-    `CREATE TABLE IF NOT EXISTS club_news(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL,body TEXT,category TEXT DEFAULT 'عام',is_published INTEGER NOT NULL DEFAULT 1,created_by TEXT,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+    `CREATE TABLE IF NOT EXISTS club_news(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL,body TEXT,category TEXT DEFAULT 'عام',is_published INTEGER NOT NULL DEFAULT 0,status TEXT NOT NULL DEFAULT 'draft',created_by TEXT,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
     `CREATE TABLE IF NOT EXISTS club_team(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,role TEXT,number TEXT,note TEXT,sort_order INTEGER DEFAULT 0,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
     `CREATE TABLE IF NOT EXISTS club_board(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,position TEXT NOT NULL,note TEXT,sort_order INTEGER DEFAULT 0,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
     `CREATE TABLE IF NOT EXISTS club_achievements(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL,achievement_date TEXT,details TEXT,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
     `CREATE TABLE IF NOT EXISTS club_audit_log(id INTEGER PRIMARY KEY AUTOINCREMENT,actor TEXT,action TEXT,entity_type TEXT,entity_id TEXT,details TEXT,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`
   ];
   for(const q of qs){try{await db.prepare(q).run()}catch(_){}}
+  const cols=new Set((await db.prepare('PRAGMA table_info(club_news)').all()).results.map(x=>x.name));
+  if(!cols.has('is_published')) {
+    await db.prepare('ALTER TABLE club_news ADD COLUMN is_published INTEGER NOT NULL DEFAULT 0').run();
+    if(cols.has('status')) await db.prepare("UPDATE club_news SET is_published=1 WHERE status IN ('published','منشور')").run();
+  }
+  for(const [col,kind] of [['category',"TEXT DEFAULT 'عام'"],['created_by','TEXT'],['status',"TEXT DEFAULT 'draft'"]]) {
+    if(!cols.has(col)) await db.prepare(`ALTER TABLE club_news ADD COLUMN ${col} ${kind}`).run();
+  }
+
 }
-async function adminSession(req,db){const c=req.headers.get('cookie')||'',x=c.match(/(?:^|;\s*)sid=([^;]+)/);if(!x)return null;const t=decodeURIComponent(x[1]);try{const a=await db.prepare(`SELECT a.id,a.username FROM sessions s JOIN admins a ON a.id=s.admin_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(t).first();if(a)return a}catch(_){}try{return await db.prepare(`SELECT u.id,u.username FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at>datetime('now')`).bind(t).first()}catch(_){return null}}
+async function adminSession(req,db){return getActor(req,db)}
 async function many(db,q,b=[]){try{return (await db.prepare(q).bind(...b).all()).results||[]}catch(_){return []}}
 async function audit(db,a,action,type,id,details=''){try{await db.prepare(`INSERT INTO club_audit_log(actor,action,entity_type,entity_id,details) VALUES(?,?,?,?,?)`).bind(a?.username||'admin',action,type,String(id||''),details).run()}catch(_){}}
 
@@ -64,12 +74,12 @@ async function publicAchievements(db){const rows=db?await many(db,`SELECT * FROM
 
 async function contentHub(db){
   const [news,team,board,ach]=await Promise.all([many(db,'SELECT * FROM club_news ORDER BY id DESC LIMIT 20'),many(db,'SELECT * FROM club_team ORDER BY sort_order,id'),many(db,'SELECT * FROM club_board ORDER BY sort_order,id'),many(db,'SELECT * FROM club_achievements ORDER BY id DESC LIMIT 20')]);
-  const body=`${form('خبر جديد','/club-admin/content/news',[['title','عنوان الخبر'],['category','التصنيف'],['body','نص الخبر']])}${list('الأخبار',news,'news',x=>x.title)}${form('إضافة لاعب/جهاز فني','/club-admin/content/team',[['name','الاسم'],['role','الصفة'],['number','الرقم'],['note','ملاحظة'],['sort_order','الترتيب']])}${list('الفريق',team,'team',x=>x.name+' — '+(x.role||''))}${form('إضافة عضو مجلس إدارة','/club-admin/content/board',[['name','الاسم'],['position','المنصب'],['note','ملاحظة'],['sort_order','الترتيب']])}${list('مجلس الإدارة',board,'board',x=>x.name+' — '+x.position)}${form('إضافة إنجاز','/club-admin/content/achievement',[['title','عنوان الإنجاز'],['achievement_date','التاريخ'],['details','التفاصيل']])}${list('الإنجازات',ach,'achievement',x=>x.title)}`;
+  const body=`${form('خبر جديد','/club-admin/content/news',[['title','عنوان الخبر'],['category','التصنيف'],['body','نص الخبر'],['status','الحالة: draft للمسودة أو published للنشر']])}${list('الأخبار',news,'news',x=>x.title+' — '+(x.is_published?'منشور':'مسودة'))}${form('إضافة لاعب/جهاز فني','/club-admin/content/team',[['name','الاسم'],['role','الصفة'],['number','الرقم'],['note','ملاحظة'],['sort_order','الترتيب']])}${list('الفريق',team,'team',x=>x.name+' — '+(x.role||''))}${form('إضافة عضو مجلس إدارة','/club-admin/content/board',[['name','الاسم'],['position','المنصب'],['note','ملاحظة'],['sort_order','الترتيب']])}${list('مجلس الإدارة',board,'board',x=>x.name+' — '+x.position)}${form('إضافة إنجاز','/club-admin/content/achievement',[['title','عنوان الإنجاز'],['achievement_date','التاريخ'],['details','التفاصيل']])}${list('الإنجازات',ach,'achievement',x=>x.title)}`;
   return adminPage('إدارة محتوى الموقع',body);
 }
 function form(title,action,fields){return `<section class="panel"><h2>${title}</h2><form method="post" action="${action}">${fields.map(([n,p])=>n==='body'||n==='details'?`<textarea name="${n}" placeholder="${p}"></textarea>`:`<input name="${n}" placeholder="${p}">`).join('')}<button>حفظ</button></form></section>`}
 function list(title,rows,type,label){return `<section class="panel"><h2>${title}</h2>${rows.length?rows.map(x=>`<article><span>${esc(label(x))}</span><form method="post" action="/club-admin/content/${type}/${x.id}/delete"><button class="danger">حذف</button></form></article>`).join(''):'<p>لا توجد بيانات بعد.</p>'}</section>`}
-async function addNews(req,db,a){const f=await req.formData(),title=String(f.get('title')||'').trim();if(title){const r=await db.prepare(`INSERT INTO club_news(title,body,category,created_by) VALUES(?,?,?,?)`).bind(title,String(f.get('body')||''),String(f.get('category')||'عام'),a.username||'admin').run();await audit(db,a,'create','news',r.meta?.last_row_id,title)}return red('/club-admin/content')}
+async function addNews(req,db,a){const f=await req.formData(),title=String(f.get('title')||'').trim(),status=String(f.get('status')||'draft').trim().toLowerCase(),published=['published','منشور','1','true'].includes(status)?1:0,stored=published?'published':'draft';if(title){const r=await db.prepare(`INSERT INTO club_news(title,body,category,status,is_published,created_by) VALUES(?,?,?,?,?,?)`).bind(title,String(f.get('body')||''),String(f.get('category')||'عام'),stored,published,a.username||'admin').run();await audit(db,a,'create','news',r.meta?.last_row_id,title+' | '+stored)}return red('/club-admin/content')}
 async function addTeam(req,db,a){const f=await req.formData(),name=String(f.get('name')||'').trim();if(name){const r=await db.prepare(`INSERT INTO club_team(name,role,number,note,sort_order) VALUES(?,?,?,?,?)`).bind(name,String(f.get('role')||''),String(f.get('number')||''),String(f.get('note')||''),Number(f.get('sort_order')||0)).run();await audit(db,a,'create','team',r.meta?.last_row_id,name)}return red('/club-admin/content')}
 async function addBoard(req,db,a){const f=await req.formData(),name=String(f.get('name')||'').trim(),pos=String(f.get('position')||'').trim();if(name&&pos){const r=await db.prepare(`INSERT INTO club_board(name,position,note,sort_order) VALUES(?,?,?,?)`).bind(name,pos,String(f.get('note')||''),Number(f.get('sort_order')||0)).run();await audit(db,a,'create','board',r.meta?.last_row_id,name)}return red('/club-admin/content')}
 async function addAchievement(req,db,a){const f=await req.formData(),title=String(f.get('title')||'').trim();if(title){const r=await db.prepare(`INSERT INTO club_achievements(title,achievement_date,details) VALUES(?,?,?)`).bind(title,String(f.get('achievement_date')||''),String(f.get('details')||'')).run();await audit(db,a,'create','achievement',r.meta?.last_row_id,title)}return red('/club-admin/content')}
