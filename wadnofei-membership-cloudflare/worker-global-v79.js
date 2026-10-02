@@ -5,6 +5,7 @@ import {normalizeRole} from './role-policy.js';
 const CLUB='نادي ود نفيع الرياضي الثقافي الاجتماعي';
 const META_VERSION='v22.0';
 const RESET_COOKIE='wdn_staff_reset';
+const recoveryStructureReady=new WeakMap();
 const ROLE_LABELS={president:'المدير/المشرف العام',secretary:'السكرتير',finance_manager:'أمين المال',owner:'المدير/المشرف العام'};
 
 export default {
@@ -311,25 +312,25 @@ async function upsertRecoveryMethod(db,userId,kind,hash,hint){
 }
 
 async function ensureRecoverySchema(db){
- const sqls=[
-  "CREATE TABLE IF NOT EXISTS club_staff_recovery_methods(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,kind TEXT NOT NULL,contact_hash TEXT NOT NULL UNIQUE,contact_hint TEXT,is_active INTEGER NOT NULL DEFAULT 1,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE(user_id,kind))",
-  "CREATE INDEX IF NOT EXISTS idx_staff_recovery_method_user ON club_staff_recovery_methods(user_id,is_active)",
-  "CREATE TABLE IF NOT EXISTS club_staff_otp(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,channel TEXT NOT NULL,contact_hash TEXT NOT NULL,code_hash TEXT NOT NULL,code_salt TEXT NOT NULL,requested_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,expires_at TEXT NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,consumed_at TEXT,provider_message_id TEXT,reset_hash TEXT,reset_expires_at TEXT)",
-  "CREATE INDEX IF NOT EXISTS idx_staff_otp_contact_time ON club_staff_otp(contact_hash,requested_at)",
-  "CREATE INDEX IF NOT EXISTS idx_staff_otp_reset ON club_staff_otp(reset_hash,reset_expires_at)"
- ];
- for(const q of sqls)try{await db.prepare(q).run()}catch(_){}
- for(const q of [
-  "ALTER TABLE club_staff_otp ADD COLUMN provider_status TEXT",
-  "ALTER TABLE club_staff_otp ADD COLUMN provider_error TEXT",
-  "ALTER TABLE club_staff_otp ADD COLUMN delivered_at TEXT",
-  "ALTER TABLE club_staff_otp ADD COLUMN read_at TEXT",
-  "ALTER TABLE club_staff_otp ADD COLUMN status_updated_at TEXT",
-  "ALTER TABLE club_staff_otp ADD COLUMN status_token_hash TEXT"
- ])try{await db.prepare(q).run()}catch(_){}
+ if(!recoveryStructureReady.has(db)){
+  recoveryStructureReady.set(db,(async()=>{
+   const sqls=[
+    "CREATE TABLE IF NOT EXISTS club_staff_recovery_methods(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,kind TEXT NOT NULL,contact_hash TEXT NOT NULL UNIQUE,contact_hint TEXT,is_active INTEGER NOT NULL DEFAULT 1,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE(user_id,kind))",
+    "CREATE INDEX IF NOT EXISTS idx_staff_recovery_method_user ON club_staff_recovery_methods(user_id,is_active)",
+    "CREATE TABLE IF NOT EXISTS club_staff_otp(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,channel TEXT NOT NULL,contact_hash TEXT NOT NULL,code_hash TEXT NOT NULL,code_salt TEXT NOT NULL,requested_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,expires_at TEXT NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,consumed_at TEXT,provider_message_id TEXT,reset_hash TEXT,reset_expires_at TEXT,provider_status TEXT,provider_error TEXT,delivered_at TEXT,read_at TEXT,status_updated_at TEXT,status_token_hash TEXT)",
+    "CREATE INDEX IF NOT EXISTS idx_staff_otp_contact_time ON club_staff_otp(contact_hash,requested_at)",
+    "CREATE INDEX IF NOT EXISTS idx_staff_otp_reset ON club_staff_otp(reset_hash,reset_expires_at)"
+   ];
+   for(const q of sqls)await db.prepare(q).run();
+   const cols=(await db.prepare("PRAGMA table_info(club_staff_otp)").all()).results.map(x=>x.name);
+   for(const required of ['provider_status','provider_error','delivered_at','read_at','status_updated_at','status_token_hash']){
+    if(!cols.includes(required))throw new Error('OTP_SCHEMA_OUTDATED');
+   }
+  })().catch(error=>{recoveryStructureReady.delete(db);throw error}));
+ }
+ await recoveryStructureReady.get(db);
  await seedAcceptedRecoveryMappings(db);
 }
-
 async function seedAcceptedRecoveryMappings(db){
  const secretary=await db.prepare("SELECT id FROM club_staff_users WHERE role='secretary' AND is_active=1 LIMIT 1").first();
  if(!secretary)return;

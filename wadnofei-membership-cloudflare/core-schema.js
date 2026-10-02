@@ -2,13 +2,16 @@ const checked = new WeakMap();
 const statements = [
   "CREATE TABLE IF NOT EXISTS admins(id INTEGER PRIMARY KEY AUTOINCREMENT,username TEXT UNIQUE,password_hash TEXT,must_change INTEGER DEFAULT 1)",
   "CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,admin_id INTEGER,expires_at TEXT)",
-  "CREATE TABLE IF NOT EXISTS applications(id INTEGER PRIMARY KEY AUTOINCREMENT,application_no TEXT UNIQUE,full_name TEXT,phone TEXT,birth_date TEXT,address TEXT,occupation TEXT,membership_type TEXT,notes TEXT,status TEXT DEFAULT 'pending',created_at TEXT DEFAULT CURRENT_TIMESTAMP,decided_at TEXT)",
-  "CREATE TABLE IF NOT EXISTS members(id INTEGER PRIMARY KEY AUTOINCREMENT,member_no TEXT UNIQUE,full_name TEXT,phone TEXT,birth_date TEXT,address TEXT,occupation TEXT,membership_type TEXT,status TEXT DEFAULT 'active',joined_at TEXT DEFAULT CURRENT_TIMESTAMP,application_id INTEGER)",
+  "CREATE TABLE IF NOT EXISTS applications(id INTEGER PRIMARY KEY AUTOINCREMENT,application_no TEXT UNIQUE,full_name TEXT,phone TEXT,birth_date TEXT,address TEXT,occupation TEXT,membership_type TEXT,notes TEXT,status TEXT DEFAULT 'pending',created_at TEXT DEFAULT CURRENT_TIMESTAMP,decided_at TEXT,review_stage TEXT DEFAULT 'received',admin_note TEXT,updated_at TEXT,payment_method TEXT,payment_currency TEXT,payment_amount REAL,payment_reference TEXT,payment_status TEXT,member_id INTEGER,reviewed_at TEXT)",
+  "CREATE TABLE IF NOT EXISTS members(id INTEGER PRIMARY KEY AUTOINCREMENT,member_no TEXT UNIQUE,full_name TEXT,phone TEXT,birth_date TEXT,address TEXT,occupation TEXT,membership_type TEXT,status TEXT DEFAULT 'active',joined_at TEXT DEFAULT CURRENT_TIMESTAMP,application_id INTEGER,card_issued_at TEXT,updated_at TEXT,membership_expires_at TEXT,dob TEXT,job TEXT,member_type TEXT,notes TEXT,photo_key TEXT,qr_token TEXT,approved_at TEXT,created_at TEXT)",
   "CREATE TABLE IF NOT EXISTS payments(id INTEGER PRIMARY KEY AUTOINCREMENT,member_id INTEGER,amount REAL,payment_type TEXT,payment_method TEXT,receipt_no TEXT,notes TEXT,paid_at TEXT DEFAULT CURRENT_TIMESTAMP)",
   "CREATE TABLE IF NOT EXISTS activities(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL,category TEXT,event_date TEXT,status TEXT DEFAULT 'مخطط',details TEXT,created_at TEXT DEFAULT CURRENT_TIMESTAMP)",
   "CREATE TABLE IF NOT EXISTS documents(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL,doc_type TEXT,reference_no TEXT,doc_date TEXT,notes TEXT,created_at TEXT DEFAULT CURRENT_TIMESTAMP)",
   "CREATE TABLE IF NOT EXISTS news(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL,body TEXT,created_at TEXT DEFAULT CURRENT_TIMESTAMP)",
   "CREATE TABLE IF NOT EXISTS audit_log(id INTEGER PRIMARY KEY AUTOINCREMENT,admin_id INTEGER,action TEXT,details TEXT,created_at TEXT DEFAULT CURRENT_TIMESTAMP)",
+  "CREATE TABLE IF NOT EXISTS club_audit_log(id INTEGER PRIMARY KEY AUTOINCREMENT,actor TEXT,action TEXT,entity_type TEXT,entity_id TEXT,details TEXT,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
+  "CREATE UNIQUE INDEX IF NOT EXISTS wdn_one_member_per_application ON members(application_id) WHERE application_id IS NOT NULL",
+  "CREATE UNIQUE INDEX IF NOT EXISTS idx_members_qr_unique_v51 ON members(qr_token) WHERE qr_token IS NOT NULL",
   "CREATE INDEX IF NOT EXISTS idx_app_status ON applications(status)",
   "CREATE INDEX IF NOT EXISTS idx_members_no ON members(member_no)",
   "CREATE INDEX IF NOT EXISTS idx_pay_member ON payments(member_id)"
@@ -16,7 +19,7 @@ const statements = [
 export async function ensureCore(db) {
   if (!checked.has(db)) checked.set(db, (async () => {
     await db.batch(statements.map(sql => db.prepare(sql)));
-    for (const [table, required] of [['applications',['application_no','full_name']], ['members',['member_no','full_name','application_id']]]) {
+    for (const [table, required] of [['applications',['application_no','full_name','member_id','review_stage','admin_note','updated_at','reviewed_at']], ['members',['member_no','full_name','application_id','qr_token','approved_at','membership_expires_at','card_issued_at']]]) {
       const cols=(await db.prepare(`PRAGMA table_info(${table})`).all()).results.map(x=>x.name);
       if(required.some(c=>!cols.includes(c))) throw new Error('Membership schema requires reviewed migration');
     }

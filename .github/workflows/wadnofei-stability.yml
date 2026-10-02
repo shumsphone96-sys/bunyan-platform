@@ -5,6 +5,7 @@ on:
     branches:
       - wadnofei-stability-v1
       - improve/wadnofei-site-review-20260926
+      - review/wadnofei-v83
     paths:
       - 'wadnofei-membership-cloudflare/**'
       - '.github/workflows/wadnofei-stability.yml'
@@ -49,7 +50,7 @@ jobs:
           node --check wadnofei-membership-cloudflare/worker-global-v72.js
           node --check wadnofei-membership-cloudflare/worker-global-v73.js
           node --check wadnofei-membership-cloudflare/src/index.js
-          for file in wadnofei-membership-cloudflare/worker-global-v7{4,5,6,7,8,9}.js wadnofei-membership-cloudflare/worker-global-v80.js wadnofei-membership-cloudflare/worker-global-v81.js wadnofei-membership-cloudflare/worker-global-v82.js wadnofei-membership-cloudflare/site-*.js wadnofei-membership-cloudflare/public-site.js; do node --check "$file"; done
+          for file in wadnofei-membership-cloudflare/worker-global-v7{4,5,6,7,8,9}.js wadnofei-membership-cloudflare/worker-global-v80.js wadnofei-membership-cloudflare/worker-global-v81.js wadnofei-membership-cloudflare/worker-global-v82.js wadnofei-membership-cloudflare/worker-global-v83.js wadnofei-membership-cloudflare/site-*.js wadnofei-membership-cloudflare/public-site.js; do node --check "$file"; done
 
       - name: Run role, security, and privacy smoke tests
         run: |
@@ -63,9 +64,9 @@ jobs:
           WDN_TEST_COMPATIBILITY_DATE=2026-08-06 node --experimental-vm-modules wadnofei-membership-cloudflare/tests/runtime.e2e.mjs
           npm audit --omit=dev --prefix wadnofei-membership-cloudflare
 
-      - name: Smoke test Cloudflare branch preview
+      - name: Smoke test current production regression
         env:
-          PREVIEW_BASE: https://improve-wadnofei-site-review-20260926-wadnofei-membership.shumsphone96.workers.dev
+          PREVIEW_BASE: https://members.shamsphone.net
         run: |
           set -euo pipefail
           public_paths=(
@@ -129,25 +130,35 @@ jobs:
           curl --retry 3 --retry-delay 1 -sS -D /tmp/wdn-bad-cookie-head -o /tmp/wdn-bad-cookie-body -H 'Cookie: club_sid=%' "${PREVIEW_BASE}/staff-login"
           grep -qi '^HTTP/.* 200' /tmp/wdn-bad-cookie-head
           grep -qi '^x-wadnofei-auth-sanitize: v81' /tmp/wdn-bad-cookie-head
-          grep -qi '^x-wadnofei-release: v82-stability' /tmp/wdn-bad-cookie-head
+          grep -qi '^x-wadnofei-release:' /tmp/wdn-bad-cookie-head
           grep -qi '^set-cookie: club_sid=;' /tmp/wdn-bad-cookie-head
 
       - name: Install browser QA dependency
         run: npm install --no-save --ignore-scripts --no-audit --no-fund puppeteer-core@24.16.0
 
-      - name: Browser responsive preview QA
-        env:
-          PREVIEW_BASE: https://improve-wadnofei-site-review-20260926-wadnofei-membership.shumsphone96.workers.dev
-        run: node wadnofei-membership-cloudflare/tests/browser-preview.mjs
+      - name: Browser responsive QA on exact PR code
+        run: |
+          set -euo pipefail
+          grep -F '"compatibility_date": "2026-09-01"' wadnofei-membership-cloudflare/wrangler.jsonc
+          npx wrangler dev --config wadnofei-membership-cloudflare/wrangler.jsonc --local --port 8791 >/tmp/wdn-local.log 2>&1 &
+          dev_pid=$!
+          trap 'kill "$dev_pid" 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8791/ >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS -D /tmp/wdn-local-head -o /tmp/wdn-local-body http://127.0.0.1:8791/
+          grep -qi '^x-wadnofei-release: v83-production-hardening' /tmp/wdn-local-head
+          PREVIEW_BASE=http://127.0.0.1:8791 node wadnofei-membership-cloudflare/tests/browser-preview.mjs
 
       - name: Verify active worker version
         run: |
-          grep -F "worker-global-v82.js" wadnofei-membership-cloudflare/src/index.js
+          grep -F "worker-global-v83.js" wadnofei-membership-cloudflare/src/index.js
 
       - name: Block destructive membership SQL in new layers
         run: |
           set -e
-          if grep -Eni "DROP[[:space:]]+TABLE|DELETE[[:space:]]+FROM[[:space:]]+(members|applications)|TRUNCATE"             wadnofei-membership-cloudflare/worker-global-v7{1,2,3,4,5,6,7,8,9}.js wadnofei-membership-cloudflare/worker-global-v80.js wadnofei-membership-cloudflare/worker-global-v81.js wadnofei-membership-cloudflare/worker-global-v82.js wadnofei-membership-cloudflare/public-site.js; then
+          if grep -Eni "DROP[[:space:]]+TABLE|DELETE[[:space:]]+FROM[[:space:]]+(members|applications)|TRUNCATE"             wadnofei-membership-cloudflare/worker-global-v7{1,2,3,4,5,6,7,8,9}.js wadnofei-membership-cloudflare/worker-global-v80.js wadnofei-membership-cloudflare/worker-global-v81.js wadnofei-membership-cloudflare/worker-global-v82.js wadnofei-membership-cloudflare/worker-global-v83.js wadnofei-membership-cloudflare/public-site.js; then
             echo "Destructive membership SQL detected"
             exit 1
           fi
@@ -164,4 +175,4 @@ jobs:
 
       - name: Summary
         run: |
-          echo "Wad Nofei V82 stability gate passed: bundle, 77 tests, runtime E2E, role/privacy checks, non-destructive membership SQL, public routes, and responsive preview QA."
+          echo "Wad Nofei V83 stability gate passed: canonical schema, runtime E2E, exact-config browser QA, role/privacy checks, non-destructive membership SQL, public routes, and production regression smoke."
