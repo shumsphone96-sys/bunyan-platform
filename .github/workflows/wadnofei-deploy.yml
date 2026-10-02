@@ -1,0 +1,70 @@
+name: Wad Nofei Production Deploy
+
+on:
+  push:
+    branches:
+      - wadnofei-cloudflare
+    paths:
+      - 'wadnofei-membership-cloudflare/**'
+      - '.github/workflows/wadnofei-deploy.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: wadnofei-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      CLOUDFLARE_ACCOUNT_ID: e851be58649396d9e830ada2a35dba4f
+      TOKEN_A: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      TOKEN_B: ${{ secrets.CF_API_TOKEN }}
+      TOKEN_C: ${{ secrets.CLOUDFLARE_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Resolve Cloudflare token
+        shell: bash
+        run: |
+          set -euo pipefail
+          token="${TOKEN_A:-}"
+          if [ -z "$token" ]; then token="${TOKEN_B:-}"; fi
+          if [ -z "$token" ]; then token="${TOKEN_C:-}"; fi
+          if [ -z "$token" ]; then
+            echo "::error::No Cloudflare API token secret is configured."
+            exit 1
+          fi
+          echo "CLOUDFLARE_API_TOKEN=$token" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        working-directory: wadnofei-membership-cloudflare
+        run: npm ci --no-audit --no-fund
+
+      - name: Deploy V83 to Cloudflare Workers
+        working-directory: wadnofei-membership-cloudflare
+        run: npx wrangler deploy --config wrangler.jsonc
+
+      - name: Verify production release and schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 12); do
+            body="$(curl -fsS --max-time 20 https://members.shamsphone.net/health || true)"
+            if printf '%s' "$body" | grep -Fq '"release":"v83-production-hardening"' &&
+               printf '%s' "$body" | grep -Fq '"schema_ready":true'; then
+              printf '%s\n' "$body"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::Production health did not confirm V83 with schema_ready=true."
+          exit 1
