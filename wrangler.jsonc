@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "wadnofei-membership",
+  "main": "wadnofei-membership-cloudflare/src/index.js",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "APP_NAME": "نادي ود نفيع الرياضي الثقافي الاجتماعي",
+    "APP_ORIGIN": "https://members.shamsphone.net",
+    "WHATSAPP_PHONE_NUMBER_ID": "1310665748797159",
+    "WHATSAPP_BUSINESS_ACCOUNT_ID": "488322071036886",
+    "WHATSAPP_TEST_RECIPIENT": "249122039004",
+    "WHATSAPP_MODE": "production"
+  },
+  "triggers": {
+    "crons": ["*/15 * * * *"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "wadnofei-membership-db",
+      "database_id": "39725aeb-ec00-4ae2-b7ef-1c68cce00f1d"
+    }
+  ]
+}
