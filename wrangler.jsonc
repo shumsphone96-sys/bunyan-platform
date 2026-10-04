@@ -10,7 +10,8 @@
     "WHATSAPP_PHONE_NUMBER_ID": "1310665748797159",
     "WHATSAPP_BUSINESS_ACCOUNT_ID": "488322071036886",
     "WHATSAPP_TEST_RECIPIENT": "249122039004",
-    "WHATSAPP_MODE": "production"
+    "WHATSAPP_MODE": "production",
+    "RUNTIME_SCHEMA_BOOTSTRAP": "off"
   },
   "triggers": {
     "crons": ["*/15 * * * *"]

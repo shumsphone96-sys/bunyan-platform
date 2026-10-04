@@ -5,7 +5,7 @@ const ROLE_LABELS={owner:'مدير النظام',reviewer:'مراجع العضو
 
 export default{
   async fetch(req,env,ctx){
-    if(env.DB) await ensureV7(env.DB);
+    if(env.DB&&env.RUNTIME_SCHEMA_BOOTSTRAP!=='off') await ensureV7(env.DB);
     const url=new URL(req.url);
     const path=url.pathname.replace(/\/$/,'')||'/';
 

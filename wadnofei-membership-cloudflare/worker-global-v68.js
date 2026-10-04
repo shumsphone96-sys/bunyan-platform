@@ -6,7 +6,7 @@ const CLUB='نادي ود نفيع الرياضي الثقافي الاجتما�
 export default {
   async fetch(req,env,ctx){
     const u=new URL(req.url),p=u.pathname.replace(/\/$/,'')||'/',m=req.method.toUpperCase();
-    if(env.DB) await ensure(env.DB);
+    if(env.DB&&env.RUNTIME_SCHEMA_BOOTSTRAP!=='off') await ensure(env.DB);
 
     if(p==='/forgot-account'&&m==='GET') return recoveryPage();
     if(p==='/forgot-account'&&m==='POST'&&env.DB) return requestRecovery(req,env.DB);

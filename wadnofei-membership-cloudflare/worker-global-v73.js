@@ -6,7 +6,7 @@ const ACCESS=new Set(['president','secretary','owner']);
 export default {
   async fetch(req,env,ctx){
     const u=new URL(req.url),p=u.pathname.replace(/\/$/,'')||'/',m=req.method.toUpperCase();
-    if(env.DB) await ensure(env.DB);
+    if(env.DB&&env.RUNTIME_SCHEMA_BOOTSTRAP!=='off') await ensure(env.DB);
 
     if(p==='/club-admin/command-center'&&env.DB){
       const a=await actor(req,env.DB);

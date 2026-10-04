@@ -41,7 +41,8 @@ async function releaseHealth(db,env){
     schema_ready:schemaReady,
     schema_error:schemaReady?'':schemaError,
     whatsapp_send_ready:!!(env.WHATSAPP_TOKEN&&env.WHATSAPP_PHONE_NUMBER_ID),
-    whatsapp_receipt_signature_ready:!!(env.WHATSAPP_APP_SECRET||env.META_APP_SECRET)
+    whatsapp_receipt_signature_ready:!!(env.WHATSAPP_APP_SECRET||env.META_APP_SECRET),
+    runtime_bootstrap:env.RUNTIME_SCHEMA_BOOTSTRAP||'on'
   };
 }
 
@@ -59,11 +60,6 @@ export default {
     const url=new URL(req.url);
     const p=url.pathname.replace(/\/$/,'')||'/';
     const m=req.method.toUpperCase();
-
-    if(env.DB&&p!=='/health'){
-      if(ctx&&ctx.waitUntil)ctx.waitUntil(ensureReleaseSchema(env.DB).catch(error=>console.error('WDN_RELEASE_SCHEMA',error?.message||'error')));
-      else ensureReleaseSchema(env.DB).catch(()=>{});
-    }
 
     if(m==='GET'&&p==='/robots.txt'){
       return response([
@@ -95,6 +91,7 @@ export default {
     const res=await app.fetch(req,env,ctx);
     const headers=new Headers(res.headers);
     headers.set('x-wadnofei-release',RELEASE);
+    headers.set('x-wadnofei-runtime',env.RUNTIME_SCHEMA_BOOTSTRAP==='off'?'fast-schema':'bootstrap');
     if(url.protocol==='https:')headers.set('strict-transport-security','max-age=31536000; includeSubDomains');
     return new Response(res.body,{status:res.status,statusText:res.statusText,headers});
   },

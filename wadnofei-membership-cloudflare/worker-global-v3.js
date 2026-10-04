@@ -34,7 +34,7 @@ export default {
       if(p==='/sw.js') return sw();
       if(p==='/health') return J({ok:true,app:'wadnofei-membership',version:'3.0'});
       if(!env.DB) return H(errorPage('قاعدة البيانات غير مربوطة'),500);
-      await init(env.DB);
+      if(env.RUNTIME_SCHEMA_BOOTSTRAP!=='off') await init(env.DB);
 
       if(p==='/club') return publicClub(env.DB);
       if(p.startsWith('/verify/')) return verify(env.DB,decodeURIComponent(p.slice(8)));

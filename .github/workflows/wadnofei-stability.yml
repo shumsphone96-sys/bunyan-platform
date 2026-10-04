@@ -140,6 +140,8 @@ jobs:
         run: |
           set -euo pipefail
           grep -F '"compatibility_date": "2026-09-01"' wadnofei-membership-cloudflare/wrangler.jsonc
+          grep -F '"RUNTIME_SCHEMA_BOOTSTRAP": "off"' wadnofei-membership-cloudflare/wrangler.jsonc
+          (cd wadnofei-membership-cloudflare && npx wrangler d1 execute DB --local --config wrangler.jsonc --file=./schema.sql)
           npx wrangler dev --config wadnofei-membership-cloudflare/wrangler.jsonc --local --port 8791 >/tmp/wdn-local.log 2>&1 &
           dev_pid=$!
           trap 'kill "$dev_pid" 2>/dev/null || true' EXIT
@@ -150,6 +152,28 @@ jobs:
           curl -fsS -D /tmp/wdn-local-head -o /tmp/wdn-local-body http://127.0.0.1:8791/
           grep -qi '^x-wadnofei-release: v83-production-hardening' /tmp/wdn-local-head
           PREVIEW_BASE=http://127.0.0.1:8791 node wadnofei-membership-cloudflare/tests/browser-preview.mjs
+
+      - name: Measure Cloudflare PR preview membership TTFB
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          slug="${GITHUB_HEAD_REF//\//-}"
+          base="https://${slug}-wadnofei-membership.shumsphone96.workers.dev"
+          ready=0
+          for i in $(seq 1 24); do
+            code="$(curl --connect-timeout 5 --max-time 12 -sS -o /dev/null -w '%{http_code}' "${base}/health" || true)"
+            if [ "$code" = "200" ]; then ready=1; break; fi
+            sleep 5
+          done
+          test "$ready" = "1"
+          for i in 1 2 3; do
+            metrics="$(curl --connect-timeout 5 --max-time 15 -sS -o /dev/null -w '%{http_code} %{time_starttransfer} %{time_total}' "${base}/membership")"
+            read -r code ttfb total <<< "$metrics"
+            echo "preview membership run=$i code=$code ttfb=$ttfb total=$total"
+            test "$code" = "200"
+            awk "BEGIN { exit !($ttfb < 5.0) }"
+          done
 
       - name: Verify active worker version
         run: |

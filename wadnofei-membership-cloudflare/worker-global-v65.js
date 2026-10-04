@@ -15,7 +15,7 @@ export default {
     if(!p.startsWith('/club-admin')&&p!=='/staff-login'&&p!=='/staff-logout'){
       return app.fetch(req,env,ctx);
     }
-    if(env.DB) await ensure(env.DB);
+    if(env.DB&&env.RUNTIME_SCHEMA_BOOTSTRAP!=='off') await ensure(env.DB);
 
     if(p==='/staff-login'){
       if(m==='GET') return loginPage(u.searchParams.get('next')||'/club-admin');

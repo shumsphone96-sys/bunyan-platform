@@ -10,7 +10,7 @@ const STAFF_SEEDS = [
 
 export default {
   async fetch(req, env, ctx) {
-    if (env.DB) await ensureStaffReady(env.DB);
+    if (env.DB&&env.RUNTIME_SCHEMA_BOOTSTRAP!=='off') await ensureStaffReady(env.DB);
     return app.fetch(req, env, ctx);
   },
   async scheduled(event, env, ctx) {

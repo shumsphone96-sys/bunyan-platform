@@ -6,7 +6,7 @@ const G='#d5a928',B='#0a347c',D='#061a43';
 
 export default {async fetch(req,env,ctx){
   const u=new URL(req.url),p=u.pathname.replace(/\/$/,'')||'/',m=req.method;
-  if(env.DB) await init(env.DB);
+  if(env.DB&&env.RUNTIME_SCHEMA_BOOTSTRAP!=='off') await init(env.DB);
 
   if(p.startsWith('/club-admin/')){
     const a=env.DB?await admin(req,env.DB):null;

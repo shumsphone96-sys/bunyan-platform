@@ -7,7 +7,7 @@ const VIEW=new Set(['president','vice_president','secretary','finance_manager','
 export default {
   async fetch(req,env,ctx){
     const u=new URL(req.url),p=u.pathname.replace(/\/$/,'')||'/',m=req.method.toUpperCase();
-    if(env.DB) await ensure(env.DB);
+    if(env.DB&&env.RUNTIME_SCHEMA_BOOTSTRAP!=='off') await ensure(env.DB);
 
     if(p==='/track-membership'&&m==='GET') return trackPage('');
     if(p==='/track-membership'&&m==='POST'&&env.DB) return track(req,env.DB);
