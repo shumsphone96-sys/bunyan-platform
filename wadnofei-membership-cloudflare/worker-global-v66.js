@@ -12,7 +12,7 @@ const CHUNK=128*1024;
 export default {
   async fetch(req,env,ctx){
     const u=new URL(req.url),p=u.pathname.replace(/\/$/,'')||'/',m=req.method.toUpperCase();
-    if(env.DB) await ensure(env.DB);
+    if(env.DB&&env.RUNTIME_SCHEMA_BOOTSTRAP!=='off') await ensure(env.DB);
 
     // One-time production seed. It permanently locks itself after first successful import.
     if(p==='/__wdn_constitution_seed_2026'&&m==='POST'&&env.DB){
