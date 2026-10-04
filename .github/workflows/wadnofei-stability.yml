@@ -140,6 +140,8 @@ jobs:
         run: |
           set -euo pipefail
           grep -F '"compatibility_date": "2026-09-01"' wadnofei-membership-cloudflare/wrangler.jsonc
+          grep -F '"RUNTIME_SCHEMA_BOOTSTRAP": "off"' wadnofei-membership-cloudflare/wrangler.jsonc
+          (cd wadnofei-membership-cloudflare && npx wrangler d1 execute DB --local --config wrangler.jsonc --file=./schema.sql)
           npx wrangler dev --config wadnofei-membership-cloudflare/wrangler.jsonc --local --port 8791 >/tmp/wdn-local.log 2>&1 &
           dev_pid=$!
           trap 'kill "$dev_pid" 2>/dev/null || true' EXIT
