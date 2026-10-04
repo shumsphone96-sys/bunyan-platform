@@ -60,11 +60,6 @@ export default {
     const p=url.pathname.replace(/\/$/,'')||'/';
     const m=req.method.toUpperCase();
 
-    if(env.DB&&p!=='/health'){
-      if(ctx&&ctx.waitUntil)ctx.waitUntil(ensureReleaseSchema(env.DB).catch(error=>console.error('WDN_RELEASE_SCHEMA',error?.message||'error')));
-      else ensureReleaseSchema(env.DB).catch(()=>{});
-    }
-
     if(m==='GET'&&p==='/robots.txt'){
       return response([
         'User-agent: *','Allow: /','Disallow: /club-admin','Disallow: /staff-login',
