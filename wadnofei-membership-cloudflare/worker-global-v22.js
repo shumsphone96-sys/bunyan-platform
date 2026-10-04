@@ -5,7 +5,7 @@ const TEST_RECIPIENT='249912930540';
 
 export default {
   async fetch(req, env, ctx) {
-    if (env.DB) await ensureNotifications(env.DB);
+    if (env.DB&&env.RUNTIME_SCHEMA_BOOTSTRAP!=='off') await ensureNotifications(env.DB);
 
     const url = new URL(req.url);
     const path = url.pathname.replace(/\/$/,'') || '/';
