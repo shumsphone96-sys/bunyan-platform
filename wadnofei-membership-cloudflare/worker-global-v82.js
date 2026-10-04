@@ -70,7 +70,7 @@ export default {
         return message('تعذر التحقق من مصدر النموذج.',403);
       }
 
-      if(env.DB&&['/membership','/membership/join'].includes(p)){
+      if(env.DB&&env.RUNTIME_SCHEMA_BOOTSTRAP!=='off'&&['/membership','/membership/join'].includes(p)){
         await ensureCore(env.DB);
       }
 
