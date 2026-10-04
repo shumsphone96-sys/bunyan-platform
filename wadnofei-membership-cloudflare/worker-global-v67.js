@@ -6,7 +6,7 @@ const LOGO='/assets/wdn-logo-v42.jpg?v=49';
 export default {
   async fetch(req,env,ctx){
     const u=new URL(req.url),p=u.pathname.replace(/\/$/,'')||'/',m=req.method.toUpperCase();
-    if(env.DB) await ensure(env.DB);
+    if(env.DB&&env.RUNTIME_SCHEMA_BOOTSTRAP!=='off') await ensure(env.DB);
 
     if(p==='/member-status'&&m==='GET'&&env.DB){
       const no=normalizeNo(u.searchParams.get('member_no')||'');
