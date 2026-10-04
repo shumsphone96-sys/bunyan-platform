@@ -11,7 +11,7 @@ export default {
   async fetch(req, env, ctx) {
     try {
       if (!env.DB) return html(page('قاعدة البيانات غير مربوطة', '<div class="box"><h2>تعذر الاتصال بقاعدة البيانات</h2></div>'), 500);
-      await ensureV5(env.DB);
+      if(env.RUNTIME_SCHEMA_BOOTSTRAP!=='off') await ensureV5(env.DB);
       const url = new URL(req.url);
       const path = clean(url.pathname);
       const method = req.method.toUpperCase();
