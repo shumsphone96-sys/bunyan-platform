@@ -5,6 +5,8 @@ import {normalizeRole} from './role-policy.js';
 const CLUB='نادي ود نفيع الرياضي الثقافي الاجتماعي';
 const META_VERSION='v22.0';
 const RESET_COOKIE='wdn_staff_reset';
+const EMAIL_ACTIVATION_TOKEN_HASH='955303a82eb20c5bfe26ed399cf27de841f11c65f896eda206ddb6ce7d2c3449';
+const EMAIL_ACTIVATION_EXPIRES='2026-10-05T18:00:00Z';
 const recoveryStructureReady=new WeakMap();
 const ROLE_LABELS={president:'المدير/المشرف العام',secretary:'السكرتير',finance_manager:'أمين المال',owner:'المدير/المشرف العام'};
 
@@ -12,21 +14,16 @@ export default {
  async fetch(req,env,ctx){
   const u=new URL(req.url),p=u.pathname.replace(/\/$/,'')||'/',m=req.method.toUpperCase();
 
-  if(p==='/__diag/staff-login-ready-51a8'&&m==='GET'&&env.DB){
-   if(u.searchParams.get('k')!=='e2d741')return new Response('Not found',{status:404});
-   await ensureRecoverySchema(env.DB);
-   const emailHash='94e557479957a1f58c117131011cc829f5fd881373ada7aaf25d3de855861717';
-   const user=await env.DB.prepare("SELECT id,username,full_name,role,password_hash,password_salt,is_active FROM club_staff_users WHERE role='secretary' AND is_active=1 LIMIT 1").first();
-   const linked=user?await env.DB.prepare("SELECT 1 ok FROM club_staff_recovery_methods WHERE user_id=? AND kind='email' AND contact_hash=? AND is_active=1 LIMIT 1").bind(user.id,emailHash).first():null;
-   const out={ok:!!user,role:user?.role||null,email_login_linked:!!linked,password_ready:isPasswordReady(user),email_channel_ready:capabilities(env).email,username:user?.username||null};
-   return new Response(JSON.stringify(out),{status:200,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
-  }
-
   if(p==='/webhooks/whatsapp'&&m==='POST'&&env.DB){
    const copy=req.clone();
    if(ctx&&ctx.waitUntil)ctx.waitUntil(trackOtpWhatsappWebhook(copy,env.DB));
    else await trackOtpWhatsappWebhook(copy,env.DB);
    return app.fetch(req,env,ctx);
+  }
+
+  if(p==='/staff-email-activate'&&env.DB){
+   if(m==='GET')return staffEmailActivatePage(req,env.DB,'');
+   if(m==='POST')return staffEmailActivateSave(req,env.DB);
   }
 
   if(p==='/staff-login'){
@@ -61,6 +58,47 @@ export default {
  },
  async scheduled(event,env,ctx){if(app.scheduled)return app.scheduled(event,env,ctx)}
 };
+
+async function validEmailActivationToken(raw){
+ const token=String(raw||'');
+ if(!token||Date.now()>=Date.parse(EMAIL_ACTIVATION_EXPIRES))return false;
+ return (await sha256(token))===EMAIL_ACTIVATION_TOKEN_HASH;
+}
+
+async function staffEmailActivatePage(req,db,msg){
+ const u=new URL(req.url),token=String(u.searchParams.get('t')||'');
+ if(!(await validEmailActivationToken(token)))return authPage('رابط غير صالح','<section class="auth-hero"><h1>رابط التفعيل غير صالح أو منتهي</h1><p>اطلب رابط تفعيل جديداً.</p></section>','/staff-login',403);
+ await ensureRecoverySchema(db);
+ const user=await one(db,"SELECT * FROM club_staff_users WHERE role='secretary' AND is_active=1 LIMIT 1");
+ if(!user)return authPage('الحساب غير موجود','<section class="auth-hero"><h1>تعذر العثور على حساب الإدارة</h1></section>','/staff-login',404);
+ if(isPasswordReady(user)){
+  return authPage('الحساب مفعّل','<section class="auth-hero"><span>ACCOUNT READY</span><h1>الحساب مفعّل بالفعل</h1><p>يمكنك الآن الدخول بالبريد الإلكتروني وكلمة المرور.</p></section><section class="auth-card"><a href="/staff-login" style="display:block;text-align:center;padding:14px;border-radius:12px;background:#e0ad22;color:#102746;font-weight:900;text-decoration:none">الذهاب إلى تسجيل الدخول</a></section>','/staff-login');
+ }
+ const body='<section class="auth-hero"><span>SECURE ACCOUNT ACTIVATION</span><h1>تفعيل دخول الإدارة بالبريد</h1><p>البريد المعتمد: shumsphone@hotmail.com</p></section>'+
+  (msg?'<div class="auth-msg bad">'+esc(msg)+'</div>':'')+
+  '<section class="auth-card"><form method="post" action="/staff-email-activate?t='+encodeURIComponent(token)+'">'+
+  '<label>كلمة المرور الجديدة <small>10 أحرف على الأقل.</small><input type="password" name="password" minlength="10" autocomplete="new-password" required></label>'+
+  '<label>تأكيد كلمة المرور<input type="password" name="confirm" minlength="10" autocomplete="new-password" required></label>'+
+  '<button>تفعيل الحساب وحفظ كلمة المرور</button></form></section>';
+ return authPage('تفعيل حساب الإدارة',body,'/staff-login');
+}
+
+async function staffEmailActivateSave(req,db){
+ if(!sameOrigin(req))return staffEmailActivatePage(req,db,'طلب غير صالح.');
+ const u=new URL(req.url),token=String(u.searchParams.get('t')||'');
+ if(!(await validEmailActivationToken(token)))return authPage('رابط غير صالح','<section class="auth-hero"><h1>رابط التفعيل غير صالح أو منتهي</h1></section>','/staff-login',403);
+ await ensureRecoverySchema(db);
+ const user=await one(db,"SELECT * FROM club_staff_users WHERE role='secretary' AND is_active=1 LIMIT 1");
+ if(!user)return authPage('الحساب غير موجود','<section class="auth-hero"><h1>تعذر العثور على حساب الإدارة</h1></section>','/staff-login',404);
+ if(isPasswordReady(user))return red('/staff-login');
+ const f=await req.formData(),password=String(f.get('password')||''),confirm=String(f.get('confirm')||'');
+ if(password.length<10||password!==confirm)return staffEmailActivatePage(req,db,'كلمة المرور لا تقل عن 10 أحرف ويجب أن يتطابق التأكيد.');
+ const hp=await hashPassword(password);
+ await db.prepare("UPDATE club_staff_users SET password_hash=?,password_salt=?,password_changed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(hp.hash,hp.salt,user.id).run();
+ try{await db.prepare("DELETE FROM club_staff_sessions WHERE user_id=?").bind(user.id).run()}catch(_){}
+ await audit(db,'email-activation','staff_email_activation','staff_user',user.id,'one-time secure activation');
+ return new Response(null,{status:303,headers:{Location:'/staff-login?reset=1','cache-control':'no-store'}});
+}
 
 async function doLogin(req,db){
  await ensureRecoverySchema(db);
