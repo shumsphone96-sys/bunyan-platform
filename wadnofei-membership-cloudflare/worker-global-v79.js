@@ -18,7 +18,7 @@ export default {
    const emailHash='94e557479957a1f58c117131011cc829f5fd881373ada7aaf25d3de855861717';
    const user=await env.DB.prepare("SELECT id,username,full_name,role,password_hash,password_salt,is_active FROM club_staff_users WHERE role='secretary' AND is_active=1 LIMIT 1").first();
    const linked=user?await env.DB.prepare("SELECT 1 ok FROM club_staff_recovery_methods WHERE user_id=? AND kind='email' AND contact_hash=? AND is_active=1 LIMIT 1").bind(user.id,emailHash).first():null;
-   const out={ok:!!user,role:user?.role||null,email_login_linked:!!linked,password_ready:isPasswordReady(user),username:user?.username||null};
+   const out={ok:!!user,role:user?.role||null,email_login_linked:!!linked,password_ready:isPasswordReady(user),email_channel_ready:capabilities(env).email,username:user?.username||null};
    return new Response(JSON.stringify(out),{status:200,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
   }
 
