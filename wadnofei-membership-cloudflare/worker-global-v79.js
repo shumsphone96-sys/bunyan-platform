@@ -53,6 +53,7 @@ export default {
 };
 
 async function doLogin(req,db){
+ await ensureRecoverySchema(db);
  const f=await req.formData();
  const identifier=String(f.get('identifier')||f.get('username')||'').trim();
  const password=String(f.get('password')||'');
