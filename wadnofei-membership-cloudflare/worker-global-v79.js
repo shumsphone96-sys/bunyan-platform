@@ -12,6 +12,21 @@ export default {
  async fetch(req,env,ctx){
   const u=new URL(req.url),p=u.pathname.replace(/\/$/,'')||'/',m=req.method.toUpperCase();
 
+  if(p==='/__diag/wa-template-7c91f2'&&m==='GET'){
+   if(u.searchParams.get('k')!=='8b4d9e71a6')return new Response('Not found',{status:404});
+   try{
+    const template=String(env.WHATSAPP_OTP_TEMPLATE||'wdn_membership_update');
+    const url='https://graph.facebook.com/'+String(env.WHATSAPP_GRAPH_VERSION||META_VERSION)+'/'+env.WHATSAPP_BUSINESS_ACCOUNT_ID+'/message_templates?fields=name,status,language,category&limit=100';
+    const r=await fetch(url,{headers:{authorization:'Bearer '+env.WHATSAPP_TOKEN}});
+    const d=await r.json().catch(()=>({}));
+    const items=Array.isArray(d?.data)?d.data.filter(x=>String(x?.name||'')===template||String(x?.name||'').includes('wdn')):[];
+    const out={ok:r.ok,http_status:r.status,configured_template:template,configured_language:String(env.WHATSAPP_OTP_LANGUAGE||'ar'),phone_number_id_present:!!env.WHATSAPP_PHONE_NUMBER_ID,waba_id_present:!!env.WHATSAPP_BUSINESS_ACCOUNT_ID,templates:items,error:d?.error?{message:String(d.error.message||''),code:d.error.code||null}:null};
+    return new Response(JSON.stringify(out),{status:r.ok?200:502,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
+   }catch(e){
+    return new Response(JSON.stringify({ok:false,error:{message:String(e?.message||e)}}),{status:502,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
+   }
+  }
+
   if(p==='/webhooks/whatsapp'&&m==='POST'&&env.DB){
    const copy=req.clone();
    if(ctx&&ctx.waitUntil)ctx.waitUntil(trackOtpWhatsappWebhook(copy,env.DB));
