@@ -131,7 +131,7 @@ async function requestOtp(req,env){
    return recoverVerify(id,'تعذر على مزود الإرسال قبول الرسالة. اطلب رمزاً جديداً أو جرّب قناة أخرى.',statusToken);
   }
  }
- return recoverVerify(id,channel==='whatsapp'?'Meta قبلت رسالة واتساب. نتحقق الآن من وصولها فعلياً للهاتف. الرمز صالح لمدة 10 دقائق.':'تم إرسال رمز مكوّن من 6 أرقام. الرمز صالح لمدة 10 دقائق.',statusToken);
+ return recoverVerify(id,channel==='whatsapp'?'تم قبول طلب الإرسال لدى Meta، لكن لم يتم تأكيد وصول الرمز للهاتف بعد. نتابع حالة التسليم تلقائياً.':'تم إرسال رمز مكوّن من 6 أرقام. الرمز صالح لمدة 10 دقائق.',statusToken);
 }
 
 async function findRecoveryUser(db,identifier,contactHash,channel){
@@ -479,13 +479,13 @@ function recoverStart(env,msg){
 }
 
 function recoverVerify(id,msg,statusToken){
- const body='<section class="auth-hero"><span>ONE-TIME CODE</span><h1>أدخل رمز التحقق</h1><p>الرمز 6 أرقام وصالح لمدة 10 دقائق فقط.</p></section>'+
+ const body='<section class="auth-hero"><span>رمز تحقق لمرة واحدة</span><h1>أدخل رمز التحقق</h1><p>الرمز 6 أرقام وصالح لمدة 10 دقائق فقط.</p></section>'+
   '<div class="auth-msg good">'+esc(msg)+'</div>'+
   '<div id="delivery-box" class="auth-msg good" style="display:none"></div>'+
   '<section class="auth-card"><form method="post" action="/staff-recover/verify"><input type="hidden" name="request_id" value="'+Number(id||0)+'">'+
   '<label>رمز التحقق<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9٠-٩]{6}" maxlength="6" required></label>'+
   '<button>تحقق</button></form><div class="auth-links"><a href="/staff-recover">طلب رمز جديد</a></div></section>'+
-  '<script>(function(){var box=document.getElementById("delivery-box");var tries=0;async function check(){tries++;try{var r=await fetch("/staff-recover/delivery-status?request_id='+Number(id||0)+'",{credentials:"same-origin",cache:"no-store"});var d=await r.json();if(d&&d.label){box.style.display="block";box.textContent=d.label;if(d.status==="failed"){box.className="auth-msg bad";return}if(d.status==="delivered"||d.status==="read"){box.className="auth-msg good";return}}}catch(e){}if(tries<20)setTimeout(check,2000)}setTimeout(check,1200)})();</script>';
+  '<script>(function(){var box=document.getElementById("delivery-box");var tries=0;async function check(){tries++;try{var r=await fetch("/staff-recover/delivery-status?request_id='+Number(id||0)+'",{credentials:"same-origin",cache:"no-store"});var d=await r.json();if(d&&d.label){box.style.display="block";box.textContent=d.label;if(d.status==="failed"){box.className="auth-msg bad";return}if(d.status==="delivered"||d.status==="read"){box.className="auth-msg good";return}}}catch(e){}if(tries<20){setTimeout(check,2000);return}box.style.display="block";box.className="auth-msg bad";box.textContent="لم يصل تأكيد تسليم الرمز من واتساب. لا تعتمد على هذا الطلب؛ اطلب رمزاً جديداً أو استخدم قناة أخرى."}setTimeout(check,1200)})();</script>';
  const response=authPage('رمز التحقق',body,'/staff-recover');
  if(!statusToken)return response;
  const h=new Headers(response.headers);h.append('Set-Cookie','wdn_otp_status='+statusToken+'; Path=/staff-recover; HttpOnly; Secure; SameSite=Strict; Max-Age=900');
@@ -499,7 +499,8 @@ async function otpDeliveryStatus(req,db){
  const row=await one(db,"SELECT provider_status,provider_error,delivered_at,read_at FROM club_staff_otp WHERE id=? AND status_token_hash=? LIMIT 1",[id,hash]);
  if(!row)return json({status:'unknown',label:''},404);
  const status=String(row.provider_status||'pending');
- const label=status==='read'?'تمت قراءة رسالة واتساب.':status==='delivered'?'✅ وصل رمز واتساب إلى الهاتف.':status==='failed'?'❌ تعذر تسليم رسالة واتساب. اطلب رمزاً جديداً أو جرّب قناة أخرى.':status==='sent'?'أُرسلت الرسالة إلى Meta وننتظر تأكيد وصولها للهاتف…':'جارٍ التحقق من التسليم…';
+ const safeError=String(row.provider_error||'').replace(/[\r\n]+/g,' ').slice(0,240);
+ const label=status==='read'?'تمت قراءة رسالة واتساب.':status==='delivered'?'✅ وصل رمز واتساب إلى الهاتف.':status==='failed'?'❌ تعذر تسليم رسالة واتساب.'+(safeError?' السبب: '+safeError:'')+' اطلب رمزاً جديداً أو جرّب قناة أخرى.':status==='sent'?'تم قبول الطلب لدى Meta، لكن لم يصلنا تأكيد بأن الرمز وصل للهاتف بعد.':'جارٍ التحقق من التسليم…';
  return json({status,label});
 }
 
