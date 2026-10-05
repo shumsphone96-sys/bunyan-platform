@@ -9,5 +9,5 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - name: Check sanitized login readiness
+      - name: Check sanitized email login readiness
         run: curl -fsS 'https://members.shamsphone.net/__diag/staff-login-ready-51a8?k=e2d741'
