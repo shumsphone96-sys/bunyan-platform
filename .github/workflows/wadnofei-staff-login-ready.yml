@@ -1,0 +1,13 @@
+name: Wad Nofei Staff Login Readiness
+on:
+  push:
+    branches:
+      - wadnofei-cloudflare
+    paths:
+      - '.github/workflows/wadnofei-staff-login-ready.yml'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check sanitized login readiness
+        run: curl -fsS 'https://members.shamsphone.net/__diag/staff-login-ready-51a8?k=e2d741'
