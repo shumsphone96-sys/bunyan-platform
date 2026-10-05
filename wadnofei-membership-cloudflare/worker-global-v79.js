@@ -12,6 +12,29 @@ export default {
  async fetch(req,env,ctx){
   const u=new URL(req.url),p=u.pathname.replace(/\/$/,'')||'/',m=req.method.toUpperCase();
 
+  if(p==='/__diag/wa-create-auth-otp-31d6a9'&&m==='POST'){
+   if(u.searchParams.get('k')!=='c58e1a4d22')return new Response('Not found',{status:404});
+   try{
+    const url='https://graph.facebook.com/'+String(env.WHATSAPP_GRAPH_VERSION||META_VERSION)+'/'+env.WHATSAPP_BUSINESS_ACCOUNT_ID+'/message_templates';
+    const payload={
+      name:'wdn_staff_otp',
+      language:'ar',
+      category:'AUTHENTICATION',
+      components:[
+        {type:'BODY',add_security_recommendation:true},
+        {type:'FOOTER',code_expiration_minutes:10},
+        {type:'BUTTONS',buttons:[{type:'OTP',otp_type:'COPY_CODE'}]}
+      ]
+    };
+    const r=await fetch(url,{method:'POST',headers:{authorization:'Bearer '+env.WHATSAPP_TOKEN,'content-type':'application/json'},body:JSON.stringify(payload)});
+    const d=await r.json().catch(()=>({}));
+    const safe=d?.error?{ok:false,http_status:r.status,error:{message:String(d.error.message||''),code:d.error.code||null,error_subcode:d.error.error_subcode||null}}:{ok:r.ok,http_status:r.status,id:d?.id||null,status:d?.status||null,category:d?.category||null};
+    return new Response(JSON.stringify(safe),{status:r.ok?200:502,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
+   }catch(e){
+    return new Response(JSON.stringify({ok:false,error:{message:String(e?.message||e)}}),{status:502,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
+   }
+  }
+
   if(p==='/__diag/wa-template-7c91f2'&&m==='GET'){
    if(u.searchParams.get('k')!=='8b4d9e71a6')return new Response('Not found',{status:404});
    try{
