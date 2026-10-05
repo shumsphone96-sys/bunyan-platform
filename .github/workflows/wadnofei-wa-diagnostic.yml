@@ -1,0 +1,15 @@
+name: Wad Nofei WhatsApp Diagnostic
+on:
+  push:
+    branches:
+      - wadnofei-cloudflare
+    paths:
+      - '.github/workflows/wadnofei-wa-diagnostic.yml'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check sanitized WhatsApp template status
+        run: |
+          set -e
+          curl -fsS 'https://members.shamsphone.net/__diag/wa-template-7c91f2?k=8b4d9e71a6'
