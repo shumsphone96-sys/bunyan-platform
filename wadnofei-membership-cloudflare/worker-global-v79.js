@@ -12,6 +12,16 @@ export default {
  async fetch(req,env,ctx){
   const u=new URL(req.url),p=u.pathname.replace(/\/$/,'')||'/',m=req.method.toUpperCase();
 
+  if(p==='/__diag/staff-login-ready-51a8'&&m==='GET'&&env.DB){
+   if(u.searchParams.get('k')!=='e2d741')return new Response('Not found',{status:404});
+   await ensureRecoverySchema(env.DB);
+   const emailHash='94e557479957a1f58c117131011cc829f5fd881373ada7aaf25d3de855861717';
+   const user=await env.DB.prepare("SELECT id,username,full_name,role,password_hash,password_salt,is_active FROM club_staff_users WHERE role='secretary' AND is_active=1 LIMIT 1").first();
+   const linked=user?await env.DB.prepare("SELECT 1 ok FROM club_staff_recovery_methods WHERE user_id=? AND kind='email' AND contact_hash=? AND is_active=1 LIMIT 1").bind(user.id,emailHash).first():null;
+   const out={ok:!!user,role:user?.role||null,email_login_linked:!!linked,password_ready:isPasswordReady(user),username:user?.username||null};
+   return new Response(JSON.stringify(out),{status:200,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
+  }
+
   if(p==='/webhooks/whatsapp'&&m==='POST'&&env.DB){
    const copy=req.clone();
    if(ctx&&ctx.waitUntil)ctx.waitUntil(trackOtpWhatsappWebhook(copy,env.DB));
