@@ -20,6 +20,8 @@ function mockDb({news=[],projects=[],gallery=[]}={}){
 async function homepage(data){
  const r=await publicSite(new Request(origin+'/'),{DB:mockDb(data)});
  assert.equal(r.status,200);
+ assert.equal(r.headers.get('x-wadnofei-ui'),'v78-organized-site');
+ assert.equal(r.headers.get('x-wadnofei-visual'),'v84-club-blue-yellow');
  return r.text();
 }
 test('v84 has branded accessible responsive homepage and all its established routes',async()=>{
@@ -33,7 +35,6 @@ test('v84 has branded accessible responsive homepage and all its established rou
  assert.equal((html.match(/<h1\b/g)||[]).length,1);
  assert.equal((html.match(/<header\b/g)||[]).length,1);
  assert.equal((html.match(/<footer\b/g)||[]).length,1);
- assert.match(html,/v84-club-blue-yellow/);
  assert.ok(premiumCss.includes('--club-blue:#1048bb'));
  assert.ok(premiumCss.includes('--club-yellow:#ffde3b'));
  assert.ok(premiumCss.includes('@media(max-width:760px)'));
