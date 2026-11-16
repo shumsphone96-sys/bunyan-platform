@@ -85,7 +85,7 @@ async function home(db){
   '<a href="/gallery"><span class="wdn-trust-icon" aria-hidden="true">▣</span><span><strong>ذاكرة النادي</strong><small>صور موثقة من أنشطتنا</small></span></a>'+
   '</nav>';
  const newsHtml=publishedNews.length?
-  '<section class="wdn-section" aria-labelledby="wdn-news-head"><div class="wdn-section-head"><div><span class="wdn-kicker">من قلب النادي</span><h2 id="wdn-news-head">آخر الأخبار</h2></div><a href="/news">عرض كل الأخبار ←</a></div>'+
+  '<section class="wdn-section"><div class="wdn-section-head"><div><span class="wdn-kicker">من قلب النادي</span><h2>آخر الأخبار</h2></div><a href="/news">عرض كل الأخبار ←</a></div>'+
   '<div class="wdn-feature-grid"><article class="wdn-news-feature"><span class="wdn-label">'+esc(publishedNews[0].category||'أخبار النادي')+'</span><h3>'+esc(publishedNews[0].title)+'</h3><p>'+esc(short(publishedNews[0].body))+'</p>'+(publishedNews[0].created_at?'<small>'+esc(String(publishedNews[0].created_at).slice(0,10))+'</small>':'')+'<a href="/news">اقرأ الأخبار ←</a></article>'+
   '<div class="wdn-news-side">'+publishedNews.slice(1).map(x=>card(x.title,short(x.body),x.category||'أخبار النادي')).join('')+
   (publishedNews.length===1?'<article class="wdn-card"><span class="wdn-label">شارك في مسيرتنا</span><h3>أخبار النادي بين يديك</h3><p>تابع الإعلانات والأنشطة الموثقة أولاً بأول من المصدر الرسمي.</p><a href="/news">تصفّح الأخبار ←</a></article>':'')+
