@@ -47,7 +47,8 @@ export function page(title,description,body,path='/',status=200){
   'referrer-policy':'strict-origin-when-cross-origin',
   'permissions-policy':'camera=(), microphone=(), geolocation=()',
   'content-security-policy':"default-src 'self'; img-src 'self' https:; style-src 'unsafe-inline'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; connect-src 'self'",
-  'x-wadnofei-ui':'v84-club-blue-yellow'
+  'x-wadnofei-ui':'v78-organized-site',
+  'x-wadnofei-visual':'v84-club-blue-yellow'
  };
  return new Response('<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0a2863"><meta name="description" content="'+esc(description)+'"><meta property="og:title" content="'+esc(title)+' · نادي ود نفيع"><meta property="og:description" content="'+esc(description)+'"><meta property="og:image" content="'+ORIGIN+LOGO+'"><meta property="og:url" content="'+ORIGIN+path+'"><link rel="canonical" href="'+ORIGIN+path+'"><title>'+esc(title)+' · نادي ود نفيع</title><style>'+siteCss+sharedCss+premiumCss+'</style></head><body>'+header(path)+'<main id="wdn-main" tabindex="-1">'+body+'</main>'+footer()+'</body></html>',{status,headers});
 }
