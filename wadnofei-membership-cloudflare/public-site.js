@@ -64,14 +64,48 @@ const generalAssemblyBox='<section class="wdn-band" aria-label="قروب الج�
 
 const areas='<div class="wdn-grid">'+card('الرياضة','رعاية المواهب والتدريب والمنافسات، وبناء بيئة تجمع الشباب حول الانضباط والعمل الجماعي.','01')+card('الثقافة','لقاءات وبرامج معرفية تفتح المجال للحوار وتبادل الخبرات والتواصل بين الأجيال.','02')+card('المجتمع','مبادرات وتطوع ومشاركة أهلية لخدمة الحي، بمساهمة أبناء ود نفيع في الداخل والخارج.','03')+'</div>';
 async function home(db){
- const [news,projects]=await Promise.all([
+ const [news,projects,gallery]=await Promise.all([
   readNews(db,3),
-  read(db,'SELECT title,summary,status FROM club_projects WHERE is_published=1 ORDER BY id DESC LIMIT 3')
+  read(db,'SELECT title,summary,status FROM club_projects WHERE is_published=1 ORDER BY id DESC LIMIT 3'),
+  read(db,'SELECT title,image_url,caption FROM club_gallery ORDER BY sort_order,id DESC LIMIT 3')
  ]);
- const section=(t,p,data,render)=>data.rows.length?'<section class="wdn-section"><div class="wdn-section-head"><h2>'+t+'</h2><a href="'+p+'">عرض الكل ←</a></div><div class="wdn-grid">'+data.rows.map(render).join('')+'</div></section>':'';
- const body='<section class="wdn-hero"><div class="wdn-hero-inner"><div><span class="wdn-eyebrow">منذ 1964 · من قلب ود نفيع</span><h1>نادي ود نفيع<span>رياضة تجمعنا.<br>ومجتمع نبنيه معاً.</span></h1><p>مساحة لأبناء الحي ومحبيه؛ نرعى المواهب، نلتقي حول المعرفة، ونعمل معاً لخدمة مجتمعنا.</p><div class="wdn-actions"><a class="wdn-button" href="/membership">انضم لعضوية النادي</a><a class="wdn-button secondary" href="/about">تعرّف على النادي</a></div></div><div class="wdn-hero-art"><img src="'+LOGO+'" width="220" height="220" alt="شعار نادي ود نفيع"><small>انتماء · مشاركة · مسؤولية</small></div></div></section><div class="wdn-wrap">'+services+generalAssemblyBox+'<section class="wdn-section"><div class="wdn-section-head"><h2>مساحة لكل مشاركة</h2><a href="/activities">أنشطة النادي ←</a></div>'+areas+'</section>'+section('آخر الأخبار','/news',news,x=>card(x.title,short(x.body),x.category||'أخبار النادي'))+section('المشروعات والمبادرات','/projects',projects,x=>card(x.title,short(x.summary),x.status||''))+(news.failed||projects.failed?'<p class="wdn-note" role="status">تعذر تحميل بعض المستجدات الآن. يمكنك إعادة المحاولة لاحقاً.</p>':'')+'<section class="wdn-band"><div><span class="wdn-label">ذاكرة النادي</span><h2>تاريخ نحفظه للأجيال</h2><p>تعرّف على مسيرة النادي وهويته، وشاركنا ما لديك من صور أو وثائق موثقة.</p></div><a class="wdn-button" href="/history">تاريخ النادي ←</a></section></div>';
+ const validPhotos=gallery.rows.filter(x=>safeUrl(x.image_url)).slice(0,3);
+ const publishedNews=news.rows.slice(0,3);
+ const hero='<section class="wdn-hero" aria-labelledby="club-hero-title">'+
+  '<div class="wdn-hero-inner">'+
+   '<div><span class="wdn-eyebrow">من قلب المناقل · منذ عام 1964</span>'+
+    '<h1 id="club-hero-title">نادي ودنفيع<span>انتماء يجمعنا.<br>وعمل يبني مستقبلنا.</span></h1>'+
+    '<p>بيت يجمع الرياضة والثقافة والعمل الاجتماعي. هنا نحتفي بمواهبنا، ونوثّق مسيرتنا، ونفتح أبواب المشاركة لأبناء ودنفيع في الداخل والخارج.</p>'+
+    '<div class="wdn-actions"><a class="wdn-button" href="/membership">انضم إلى النادي</a><a class="wdn-button secondary" href="/news">اكتشف أخبارنا</a></div></div>'+
+   '<div class="wdn-hero-art"><div class="wdn-crest-frame"><img src="'+LOGO+'" width="260" height="260" decoding="async" alt="الشعار الرسمي لنادي ودنفيع"></div><span class="wdn-year-pill">تأسس عام 1964</span><small>الرياضة · الثقافة · المجتمع</small></div>'+
+  '</div></section>';
+ const quick='<nav class="wdn-trustbar" aria-label="روابط سريعة للنادي">'+
+  '<a href="/team"><span class="wdn-trust-icon" aria-hidden="true">⚽</span><span><strong>فريقنا</strong><small>اللاعبون والجهاز الفني</small></span></a>'+
+  '<a href="/events"><span class="wdn-trust-icon" aria-hidden="true">✦</span><span><strong>الفعاليات</strong><small>الرياضة والثقافة والمجتمع</small></span></a>'+
+  '<a href="/gallery"><span class="wdn-trust-icon" aria-hidden="true">▣</span><span><strong>ذاكرة النادي</strong><small>صور موثقة من أنشطتنا</small></span></a>'+
+  '</nav>';
+ const newsHtml=publishedNews.length?
+  '<section class="wdn-section" aria-labelledby="wdn-news-head"><div class="wdn-section-head"><div><span class="wdn-kicker">من قلب النادي</span><h2 id="wdn-news-head">آخر الأخبار</h2></div><a href="/news">عرض كل الأخبار ←</a></div>'+
+  '<div class="wdn-feature-grid"><article class="wdn-news-feature"><span class="wdn-label">'+esc(publishedNews[0].category||'أخبار النادي')+'</span><h3>'+esc(publishedNews[0].title)+'</h3><p>'+esc(short(publishedNews[0].body))+'</p>'+(publishedNews[0].created_at?'<small>'+esc(String(publishedNews[0].created_at).slice(0,10))+'</small>':'')+'<a href="/news">اقرأ الأخبار ←</a></article>'+
+  '<div class="wdn-news-side">'+publishedNews.slice(1).map(x=>card(x.title,short(x.body),x.category||'أخبار النادي')).join('')+
+  (publishedNews.length===1?'<article class="wdn-card"><span class="wdn-label">شارك في مسيرتنا</span><h3>أخبار النادي بين يديك</h3><p>تابع الإعلانات والأنشطة الموثقة أولاً بأول من المصدر الرسمي.</p><a href="/news">تصفّح الأخبار ←</a></article>':'')+
+  '</div></div></section>':'';
+ const projectsHtml=projects.rows.length?
+  '<section class="wdn-section"><div class="wdn-section-head"><div><span class="wdn-kicker">نحو مجتمع أفضل</span><h2>المشروعات والمبادرات</h2></div><a href="/projects">عرض المشروعات ←</a></div><div class="wdn-grid">'+projects.rows.map(x=>card(x.title,short(x.summary),x.status||'')).join('')+'</div></section>':'';
+ const galleryHtml=validPhotos.length?
+  '<section class="wdn-section"><div class="wdn-section-head"><div><span class="wdn-kicker">لحظات من ذاكرتنا</span><h2>صور من حياة النادي</h2></div><a href="/gallery">زيارة المعرض ←</a></div><div class="wdn-gallery-grid">'+
+  validPhotos.map(x=>'<figure class="wdn-photo"><img src="'+esc(safeUrl(x.image_url))+'" alt="'+esc(x.title||'صورة من نادي ودنفيع')+'" loading="lazy" decoding="async" referrerpolicy="no-referrer"><figcaption>'+esc(x.caption||x.title||'من أنشطة النادي')+'</figcaption></figure>').join('')+
+  '</div></section>':'';
+ const note=(news.failed||projects.failed||gallery.failed)?'<p class="wdn-note" role="status">تعذر تحميل بعض المستجدات الآن. يمكنك إعادة المحاولة لاحقاً.</p>':'';
+ const body=hero+'<div class="wdn-wrap">'+quick+
+  '<section class="wdn-section wdn-areas"><div class="wdn-section-head"><div><span class="wdn-kicker">أكثر من كرة قدم</span><h2>بيت الرياضة والثقافة والمجتمع</h2><p class="wdn-editorial-lead">من الملعب إلى المبادرات التي تخدم أهل الحي؛ رسالتنا تمتد إلى كل مساحة يمكن أن نصنع فيها أثراً.</p></div><a href="/activities">أنشطة النادي ←</a></div>'+areas+'</section>'+
+  newsHtml+galleryHtml+projectsHtml+note+
+  '<section class="wdn-section"><div class="wdn-section-head"><div><span class="wdn-kicker">خدمات إلكترونية</span><h2>عضويتك بخطوات واضحة</h2></div></div>'+services+'</section>'+
+  generalAssemblyBox+
+  '<section class="wdn-section"><div class="wdn-band"><div><span class="wdn-label">منذ عام 1964</span><h2>تاريخ نحفظه، ومستقبل نبنيه</h2><p>تعرّف على مسيرة النادي وساهم بما لديك من وثائق وصور موثوقة لحفظ ذاكرة ودنفيع للأجيال القادمة.</p></div><a class="wdn-button" href="/history">تاريخ النادي ←</a></div></section></div>';
  return page('الرئيسية',CLUB+' · تأسس عام 1964. الأنشطة والأخبار وخدمات العضوية الإلكترونية.',body);
 }
+
 function short(v){const s=String(v||'').trim();return s.length>180?s.slice(0,180)+'…':s}
 const collections={
  '/news':['الأخبار','أخبار النادي وإعلاناته المنشورة.','SELECT title,body,category,created_at FROM club_news WHERE is_published=1 ORDER BY id DESC LIMIT 50',x=>card(x.title,x.body,x.category||'أخبار النادي'),'لا توجد أخبار منشورة حالياً.'],
